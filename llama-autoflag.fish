@@ -504,6 +504,7 @@ if test $MODEL_GB -gt $VRAM_THRESHOLD; and test "$GPU_MODE" = "auto"
     set SAFETY_NOTICES "$SAFETY_NOTICES ⚠ Model size ($MODEL_GB GB) exceeds GPU safe threshold ($VRAM_THRESHOLD GB = $USABLE_VRAMGB usable - 4GB context)"
 end
 
+echo "DEBUG-CHECK: should_calc=$should_calc_n_gl NGL=$NGL NGL_USER_SET=$NGL_USER_SET CPU_FALLBACK=$CPU_FALLBACK GPU_COUNT=$GPU_COUNT GPU_MODE=$GPU_MODE"
 # Determine NGL based on model size vs VRAM
 set -l should_calc_n_gl 0
 if test $NGL_USER_SET -eq 1
