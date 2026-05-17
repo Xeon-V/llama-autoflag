@@ -4,80 +4,156 @@ Auto-detect hardware and generate optimal llama.cpp flags.
 
 **Version: Alpha 3** | For dual NVIDIA TITAN V (sm_70), CUDA 12.9
 
-## Usage
+---
+
+## Quick Start
 
 ```bash
-./llama-autoflag.fish -m ~/models/Qwen3-8B-Q4_K_M.gguf --dir ~/llama-bee
+# Install
+curl -LO https://raw.githubusercontent.com/Xeon-V/llama-autoflag/master/llama-autoflag.fish
+chmod +x llama-autoflag.fish
+
+# Run with your model
+fish ./llama-autoflag.fish -m ~/models/Qwen3-8B-Q4_K_M.gguf --dir ~/llama-bee
 ```
+
+---
 
 ## Options
 
-| Option | Description |
-|--------|-------------|
-| `-m <path>` | Model file (required) |
-| `-d, --draft <path>` | Draft model for speculative decode |
-| `--dir <path>` | llama.cpp build directory (default: ./build) |
-| `-p <text>` | Prompt to run |
-| `-n <n>` | Max tokens (default: 128) |
-| `--temp <n>` | Temperature (default: 0.6) |
-| `-t <type>` | Type: text, vision, omni, api |
-| `-q <type>` | KV cache: q8_0, q4_0, turbo3 |
-| `--cpu` | Force CPU-only |
-| `--dry-run` | Show flags without running |
-| `--detect-only` | Show hardware info |
-| `--self-test` | Run self-tests |
-| `-h` | Show help |
+| Option | Description | Default |
+|--------|-------------|---------|
+| `-m <path>` | Model file (required) | - |
+| `--dir <path>` | llama.cpp build directory | `./build` |
+| `-d, --draft <path>` | Draft model for speculative decode | - |
+| `-p <text>` | Prompt to run | interactive |
+| `-n <n>` | Max tokens to generate | 128 |
+| `--temp <n>` | Temperature | 0.6 |
+| `-t <type>` | Inference type: text, vision, omni, api | text |
+| `-q <type>` | KV cache: q8_0, q4_0, turbo3 | auto |
+| `-c <n>` | Context size (tokens) | auto |
+| `--cpu` | Force CPU only | GPU if available |
+| `--dry-run` | Show command without running | - |
+| `--detect-only` | Show hardware info only | - |
+| `-h` | Show help | - |
 
-## Examples
+---
+
+## Predefined Commands
+
+### Basic Usage
 
 ```bash
-# Auto-detect and run
-./llama-autoflag.fish -m ~/models/Qwen3-8B-Q4_K_M.gguf --dir ~/llama-bee
+# Dry-run (see flags without running)
+fish ./llama-autoflag.fish -m ~/models/<model>.gguf --dir ~/llama-bee --dry-run
 
-# Dry-run to see flags
-./llama-autoflag.fish -m ~/models/Qwen3-8B-Q4_K_M.gguf --dir ~/llama-bee --dry-run
+# Interactive chat mode
+fish ./llama-autoflag.fish -m ~/models/<model>.gguf --dir ~/llama-bee
 
-# Speculative decode with draft model
-./llama-autoflag.fish -m ~/models/Qwen3-8B-Q4_K_M.gguf -d ~/models/Qwen3-1B-Q4_K_M.gguf
-
-# Force CPU for large models
-./llama-autoflag.fish -m ~/models/Qwen2.5-72B-Q4_K_M.gguf --cpu
-
-# Multimodal with text mode
-./llama-autoflag.fish -m ~/models/Qwen2.5-Omni-7B-Q4_K_M.gguf -t text
-
-# Hardware detection only
-./llama-autoflag.fish --detect-only
+# Single prompt, save output
+echo "What is AI?" | fish ./llama-autoflag.fish -m ~/models/<model>.gguf --dir ~/llama-bee -p "$(cat)" -n 256
 ```
+
+### Model Size Examples
+
+```bash
+# Small model (≤8B) - full GPU
+fish ./llama-autoflag.fish -m ~/models/Qwen3-8B-Q4_K_M.gguf --dir ~/llama-bee
+
+# Medium model (10-30B) - partial offload
+fish ./llama-autoflag.fish -m ~/models/Qwen2.5-32B-Q4_K_M.gguf --dir ~/llama-bee
+
+# Large model (>30B) - CPU fallback or minimal GPU
+fish ./llama-autoflag.fish -m ~/models/Qwen2.5-72B-Q4_K_M.gguf --dir ~/llama-bee --cpu
+```
+
+### Speculative Decoding
+
+```bash
+# Draft model (smaller, faster)
+fish ./llama-autoflag.fish -m ~/models/Qwen3-8B-Q4_K_M.gguf -d ~/models/Qwen3-1B-Q4_K_M.gguf --dir ~/llama-bee
+```
+
+### KV Cache Tuning
+
+```bash
+# Force turbo3 for large models (faster but more VRAM)
+fish ./llama-autoflag.fish -m ~/models/Qwen2.5-72B-Q4_K_M.gguf -q turbo3 --dir ~/llama-bee
+
+# Force q8_0 for stability
+fish ./llama-autoflag.fish -m ~/models/<model>.gguf -q q8_0 --dir ~/llama-bee
+```
+
+### Context Size
+
+```bash
+# Small context (faster)
+fish ./llama-autoflag.fish -m ~/models/<model>.gguf -c 4096 --dir ~/llama-bee
+
+# Large context (more memory)
+fish ./llama-autoflag.fish -m ~/models/<model>.gguf -c 65536 --dir ~/llama-bee
+```
+
+### Hardware Detection
+
+```bash
+# Show detected hardware only
+fish ./llama-autoflag.fish --detect-only
+```
+
+---
+
+## Hardware Tested
+
+- **GPUs**: Dual NVIDIA TITAN V (12GB each, sm_70)
+- **CPU**: Intel Xeon E5-2697 v3 (28 cores, 2x)
+- **RAM**: 128GB DDR4
+- **OS**: CachyOS (kernel 6.x)
+- **CUDA**: 12.9
+
+---
 
 ## Features
 
-- **Auto GPU layers**: Calculates based on VRAM and model size
-- **KV cache**: Auto-selects q8_0/turbo3/asymmetric based on model size
-- **TURBOQUANT safety**: <10B blocks turbo3, 10-27B uses asymmetric, >=27B allows turbo3
-- **MoE support**: Parses active params (30B-A3B → 3B active)
-- **Tensor split**: Asymmetric 0.55,0.45 when KWin compositor detected
-- **NUMA**: Auto-enables for dual-socket CPUs
-- **Draft validation**: Blocks mismatched architectures for speculative decode
-- **CUDA graphs**: Auto-disables for dual-GPU stability
-- **Custom binary path**: --dir option for llama.cpp directory
+| Feature | Description |
+|---------|-------------|
+| Auto GPU layers | Calculates VRAM vs model size |
+| KV cache | Auto-selects q8_0/turbo3/asymmetric |
+| KWin detection | Accounts for 2GB VRAM overhead |
+| Tensor split | Asymmetric 0.55/0.45 for dual-GPU |
+| CUDA graphs | Auto-disables for dual-GPU stability |
+| NUMA | Auto-enables for multi-socket CPUs |
+| MoE support | Parses active params (e.g., 30B-A3B) |
+| mlock | Prevents OS swapping |
 
-## Hardware
-
-Tested on:
-- Dual NVIDIA TITAN V (12GB each, sm_70)
-- Intel Xeon E5-2697 v3 (28 cores)
-- 128GB RAM
-- CachyOS (kernel 6.x)
+---
 
 ## Requirements
 
 | Component | Minimum |
 |-----------|----------|
+| Shell | Fish 3.0+ |
 | CPU | 8 cores |
 | RAM | 32GB |
 | GPU | 8GB VRAM |
-| Shell | Fish 3.0+ |
+
+---
+
+## Troubleshooting
+
+### "test: Missing argument"
+- Update to latest version: `curl -LO https://raw.githubusercontent.com/Xeon-V/llama-autoflag/master/llama-autoflag.fish`
+
+### Model not found
+- Use absolute path: `-m /home/xeonv/models/<model>.gguf`
+
+### Invalid argument
+- Check llama.cpp binary: `--dir ~/llama-bee`
+
+### Out of VRAM
+- Try `--cpu` or reduce `-c` context size
+
+---
 
 ## License
 
