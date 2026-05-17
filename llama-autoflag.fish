@@ -1,6 +1,6 @@
 #!/usr/bin/env fish
 # llama-autoflag.fish — Auto-detects hardware and generates optimal llama.cpp flags
-# Version: 1.2.0
+# Version: 1.0.0
 # Tailored for: Dual NVIDIA TITAN V (sm_70), CUDA 12.9, Driver 580.x, CachyOS
 
 set -l VERSION "1.2.0"
@@ -199,7 +199,7 @@ function __run_self_test
     
     # Test 7: Arithmetic
     echo -n "Test 7: Float arithmetic... "
-    set -l result (math "10 * 100 / 3")
+    set -l result (math "10 / 3")
     if test "$result" != "0"
         echo "✓ PASS"
         set passed (math $passed + 1)
@@ -335,76 +335,8 @@ end
 # ─── Model Parsing ───
 function parse_model_size
     set -l path $argv[1]
-    if string match -rq '~' "$path"
-        set path (string replace -r '^~' "$HOME" "$path")
-    end
-
-    set -l filename (basename "$path")
-    set -l params ""
-    set -l active_params ""
-    set -l is_moe 0
-
-    # Parse params from filename - simpler patterns
-    if string match -rq '*A*B*' "$filename"
-        set params (echo "$filename" | grep -oP '\d+B-' | head -1 | tr -d 'B-')
-        set active_params (echo "$filename" | grep -oP 'A\d+B' | tr -d 'AB')
-        set is_moe 1
-    else
-        set params (echo "$filename" | grep -o '\d+B' | tail -1 | tr -d 'B')
-    end
-
-    # Calculate GB estimate
-    set -l gb 4
-    if test -n "$params"
-        set gb (math "$params * 2")
-        if test $gb -lt 1
-            set gb 4
-        end
-    end
-
-    echo "$gb:$params:$active_params:$is_moe"
-end
-
-    
-    set -l filename (basename "$path")
-    set -l params ""
-    set -l active_params ""
-    set -l is_moe 0
-    
-    # Get file size if possible
-    set -l bytes 0
-    if test -f "$path"
-        set bytes (stat -c%s "$path" 2>/dev/null; or echo 0)
-    end
-    
-    # Parse params from filename
-    if string match -rq '.*-A.*B.*' "$filename"
-        set params (string match -r '.*?(\d+)B-' "$filename" | head -1 | string replace 'B-' '')
-        set active_params (string match -r '-A(\d+)B' "$filename" | string replace -r '-A' '')
-        set is_moe 1
-    else
-        set params (string match -r '(\d+)B?' "$filename" | tail -1)
-    end
-    
-    # Calculate GB
-    set -l gb 4
-    if test -n "$params"
-        set gb (math "$params * 2")
-        if test $gb -lt 1
-            set gb 4
-        end
-    end
-    
-    echo "$gb:$params:$active_params:$is_moe"
-end
-
-    
     set -l bytes (stat -c%s "$path" 2>/dev/null; or stat -f%z "$path" 2>/dev/null; or echo 0)
-    if test "$bytes" = "0"
-        echo "0:0::0"
-        return
-    end
-    set -l gb (math "floor($bytes / 1073741824 * 100) / 100")
+    set -l gb (math "$bytes / 1073741824")
 
     # Parse parameter count from filename
     set -l filename (basename "$path")
@@ -531,7 +463,7 @@ if test $KWIN_RUNNING -eq 1; and test $GPU_COUNT -gt 1
     # KWin uses ~1-2GB on GPU 1
     set VRAM_OVERHEAD 2
     set USABLE_VRAM (math "$TOTAL_VRAM - $VRAM_OVERHEAD")
-    set SAFETY_NOTICES "$SAFETY_NOTICES ℹ KWin compositor detected — VRAM overhead: $VRAM_OVERHEAD GB"
+    set SAFETY_NOTICES "$SAFETY_NOTICES ℹ KWin compositor detected — VRAM overhead: ${VRAM_OVERHEAD}GB"
 end
 
 # VRAM threshold buffer: model > usable-4GB triggers CPU fallback
@@ -539,13 +471,52 @@ end
 set -l VRAM_THRESHOLD (math "$USABLE_VRAM - 4")
 if test $MODEL_GB -gt $VRAM_THRESHOLD; and test "$GPU_MODE" = "auto"
     set CPU_FALLBACK 1
-    set SAFETY_NOTICES "$SAFETY_NOTICES ⚠ Model size ($MODEL_GB GB) exceeds GPU safe threshold ($VRAM_THRESHOLD GB = $USABLE_VRAM GB usable - 4GB context)"
+    set SAFETY_NOTICES "$SAFETY_NOTICES ⚠ Model size ($MODEL_GB GB) exceeds GPU safe threshold ($VRAM_THRESHOLD GB = ${USABLE_VRAM}GB usable - 4GB context)"
 end
 
 # Determine NGL based on model size vs VRAM
 if test $CPU_FALLBACK -eq 0; and test $GPU_COUNT -gt 0; and test "$GPU_MODE" != "none"
-    # Offload all layers to GPU
-    set NGL 99
+    # Use EFFECTIVE_PARAMS for MoE (active params), otherwise MODEL_PARAMS
+    if test -n "$EFFECTIVE_PARAMS"
+        set -l params_num (echo $EFFECTIVE_PARAMS | tr -d 'B')
+    else if test -n "$MODEL_PARAMS"
+        set -l params_num (echo $MODEL_PARAMS | tr -d 'B')
+    else
+        set params_num 0
+    end
+    
+    if test $params_num -gt 0
+        # Estimate layer size: model GB / typical layer count
+        set -l est_layers 32
+        if test $params_num -ge 70
+            set est_layers 80
+        else if test $params_num -ge 27
+            set est_layers 64
+        else if test $params_num -ge 14
+            set est_layers 48
+        else if test $params_num -ge 8
+            set est_layers 32
+        end
+        set -l vram_per_layer (math "$MODEL_GB / $est_layers")
+        set -l max_layers (math "floor($USABLE_VRAM / $vram_per_layer)")
+
+        if test $max_layers -ge 99
+            set NGL 99
+        else
+            set NGL $max_layers
+        end
+    else
+        # Fallback: if model < 80% of VRAM, full offload
+        set -l ratio (math "$MODEL_GB / $TOTAL_VRAM")
+        if test $ratio -lt 0.8
+            set NGL 99
+        else
+            set NGL (math "floor(99 * (1 - $ratio) + 10)")
+            if test $NGL -lt 10
+                set NGL 10
+            end
+        end
+    end
 end
 
 # Tensor split: asymmetric when KWin compositor detected
@@ -561,7 +532,7 @@ if test $GPU_COUNT -eq 2; and test $NGL -gt 0
     set -a ENV_VARS "CUDA_MODULE_LOADING=LAZY"
 else if test $GPU_COUNT -gt 2
     set -l ts_str ""
-    set -l ts_val (math "100 / $GPU_COUNT")
+    set -l ts_val (math "1.0 / $GPU_COUNT")
     for i in (seq 1 $GPU_COUNT)
         if test -n "$ts_str"
             set ts_str "$ts_str,$ts_val"
@@ -702,9 +673,9 @@ if test -n "$DRAFT_MODEL"
             set -l target_params (echo $EFFECTIVE_PARAMS | tr -d 'B')
             set -l draft_params (echo $MODEL_PARAMS | tr -d 'B')
             if test $target_params -gt 0; and test $draft_params -gt 0
-                set -l ratio (math "$target_params * 10 / $draft_params")
-                if test $ratio -lt 20; or test $ratio -gt 80
-                    set SAFETY_NOTICES "$SAFETY_NOTICES ⚠ Draft/target ratio: $ratio (optimal: 2-8x)"
+                set -l ratio (math "$target_params / $draft_params")
+                if test $ratio -lt 2; or test $ratio -gt 8
+                    set SAFETY_NOTICES "$SAFETY_NOTICES ⚠ Draft/target ratio: ${ratio}x (optimal: 2-8x)"
                 end
             end
         end
@@ -784,7 +755,7 @@ if test $DETECT_ONLY -eq 1
     echo "============================================"
     echo ""
     echo "CPU: $CPU_NAME, $CPU_CORES cores, $CPU_SOCKETS socket(s)"
-    echo "RAM: $RAM_GBGB"
+    echo "RAM: {$RAM_GB}GB"
     echo "NUMA: $NUMA_NODES node(s)"
     echo "KWin: $KWIN_RUNNING (0=no, 1=yes)"
     echo "mlock: $MLOCK_OK"
@@ -795,7 +766,7 @@ if test $DETECT_ONLY -eq 1
     for name in $GPU_NAMES
         set -l vram $GPU_VRAMS[(math $idx + 1)]
         set -l cc $GPU_CCS[(math $idx + 1)]
-        echo "  GPU $idx: $name | $vramGB VRAM | sm_$cc"
+        echo "  GPU $idx: $name | {$vram}GB VRAM | sm_$cc"
         set idx (math $idx + 1)
     end
     if test $GPU_COUNT -eq 0
@@ -813,10 +784,10 @@ echo ""
 echo "📊 SYSTEM DETECTED"
 echo "─────────────────────────────────────────────────────────────"
 echo "🖥️  CPU: $CPU_NAME, $CPU_CORES cores, $CPU_SOCKETS socket(s)"
-echo "💾 RAM: $RAM_GBGB total"
+echo "💾 RAM: {$RAM_GB}GB total"
 echo "🌐 NUMA: $NUMA_NODES node(s)"
 if test $KWIN_RUNNING -eq 1
-    echo "🪟 Compositor: KWin ($VRAM_OVERHEAD GB VRAM overhead)"
+    echo "🪟 Compositor: KWin (${VRAM_OVERHEAD}GB VRAM overhead)"
 end
 if test $RT_KERNEL -eq 1
     echo "⚡ Kernel: PREEMPT_RT detected (--mlock disabled)"
@@ -832,7 +803,7 @@ for name in $GPU_NAMES
     if string match -q "7.0" "$cc"
         set arch "✅ Volta"
     end
-    echo "   GPU $idx: $name | $vramGB VRAM | sm_$cc $arch"
+    echo "   GPU $idx: $name | {$vram}GB VRAM | sm_$cc $arch"
     set idx (math $idx + 1)
 end
 if test $GPU_COUNT -eq 0
@@ -843,7 +814,7 @@ echo ""
 echo "📦 MODEL"
 echo "─────────────────────────────────────────────────────────────"
 echo "   Path: $MODEL"
-echo "   Size: $MODEL_GBGB"
+echo "   Size: {$MODEL_GB}GB"
 if test -n "$PARAMS_DISPLAY"
     echo "   Params: $PARAMS_DISPLAY"
 end
@@ -863,7 +834,7 @@ echo ""
 echo "⚙️  INFERENCE CONFIG"
 echo "─────────────────────────────────────────────────────────────"
 echo "   Type: $INF_TYPE"
-echo "   GPUs: $GPU_COUNT (VRAM: $TOTAL_VRAMGB total, $USABLE_VRAMGB usable)"
+echo "   GPUs: $GPU_COUNT (VRAM: {$TOTAL_VRAM}GB total, {$USABLE_VRAM}GB usable)"
 if test $NGL -gt 0
     echo "   GPU Layers: $NGL/99"
 else
