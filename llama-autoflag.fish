@@ -1,6 +1,6 @@
 #!/usr/bin/env fish
 # llama-autoflag.fish — Auto-detects hardware and generates optimal llama.cpp flags
-# Version: 1.0.0
+# Version: 1.2.0
 # Tailored for: Dual NVIDIA TITAN V (sm_70), CUDA 12.9, Driver 580.x, CachyOS
 
 set -l VERSION "1.2.0"
