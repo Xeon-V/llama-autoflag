@@ -64,6 +64,7 @@ while test $i -le (count $argv)
             set i (math $i + 1)
             set CONTEXT $argv[$i]
         case '-ngl'
+echo "DEBUG: argv[$i]=$argv[$i]"
             set i (math $i + 1)
             set -g NGL $argv[$i]
             set -g NGL_USER_SET 1
