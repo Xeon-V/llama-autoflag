@@ -61,6 +61,9 @@ while test $i -le (count $argv)
         case '-c' '--context'
             set i (math $i + 1)
             set CONTEXT $argv[$i]
+        case '-ngl'
+            set i (math $i + 1)
+            set NGL $argv[$i]
         case '-q' '--kv-quant'
             set i (math $i + 1)
             set KV_QUANT $argv[$i]
@@ -114,6 +117,7 @@ function __print_help
     echo "  --split-mode <mode>    Split mode: layer|row (default: layer)"
     echo "  -fa, --flash-attn      Enable Flash Attention (saves VRAM)"
     echo "  -c, --context <n>      Context size in tokens (auto-detect if omitted)"
+    echo "  -ngl <n>              GPU layers (default: auto)"
     echo "  -q, --kv-quant <type>   KV cache quant: q8_0|q4_0|q4_1|fp16|q5_0|q5_1|turbo3"
     echo "  -s, --spec-type <type>  Speculative: dflash|default"
     echo "  -g, --gpu <mode>        GPU mode: auto|none"
