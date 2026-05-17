@@ -708,8 +708,10 @@ if test -n "$DRAFT_MODEL"
     end
 end
 
-# Binary selection
-set -l LLAMA_DIR "./build"
+# Binary selection (skip if already set via --dir)
+if test -z "$LLAMA_DIR"
+    set -l LLAMA_DIR "./build"
+end
 set -l LLAMA_BIN "$LLAMA_DIR/bin/llama-cli"
 if test "$INF_TYPE" = "api"
     set LLAMA_BIN "$LLAMA_DIR/bin/llama-server"
