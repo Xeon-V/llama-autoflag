@@ -257,7 +257,7 @@ if test -z "$MODEL"; and test -z "$SERVER_MODELS_DIR"
     exit 1
 end
 
-if not test -f "$MODEL"
+if test -z "$SERVER_MODELS_DIR"; and not test -f "$MODEL"
     echo "❌ Error: Model not found: $MODEL"
     exit 1
 end
