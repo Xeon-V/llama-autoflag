@@ -158,3 +158,42 @@ fish ./llama-autoflag.fish --detect-only
 ## License
 
 MIT
+
+---
+
+## Server / Router Mode
+
+Start llama-server in **router mode** for live model switching:
+
+```bash
+# Start router (auto-discovers all models in folder)
+fish ./llama-autoflag.fish --models-dir ~/models --port 8081 --dir ~/llama-bee
+```
+
+### How It Works
+
+1. **No `-m` flag** → enters router mode
+2. Server scans `--models-dir` for all `.gguf` files
+3. Models indexed, NOT loaded until requested
+4. Switch models via API without restart
+
+### API Usage
+
+```bash
+# List available models
+curl http://localhost:8081/models
+
+# Chat with specific model (in JSON body)
+curl http://localhost:8081/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{"model": "Qwen3-8B-Q4_K_M.gguf", "messages": [{"role": "user", "content": "Hello"}]}'
+
+# Switch to different model (just change model name)
+curl http://localhost:8081/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{"model": "DeepSeek-R1-Distill-Qwen-32B-Q4_K_M.gguf", "messages": [{"role": "user", "content": "Explain AI"}]}'
+```
+
+### Web UI
+
+Open http://localhost:8081/ in browser - dropdown to switch models live!
