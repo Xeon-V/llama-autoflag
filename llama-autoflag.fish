@@ -736,6 +736,11 @@ end
 set -l CMD "$LLAMA_BIN"
 set -l FLAGS ""
 
+# Add model flag for CLI (not server mode)
+if test -z "$SERVER_MODELS_DIR"
+    set FLAGS "-m \"$MODEL\""
+end
+
 if test $NGL -gt 0
     set FLAGS "$FLAGS -ngl $NGL"
 end
