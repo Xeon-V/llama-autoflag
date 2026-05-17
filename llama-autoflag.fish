@@ -767,7 +767,7 @@ if test $DETECT_ONLY -eq 1
     echo "============================================"
     echo ""
     echo "CPU: $CPU_NAME, $CPU_CORES cores, $CPU_SOCKETS socket(s)"
-    echo "RAM: $RAM_GBGB"
+    echo "RAM: $RAM_GB GB"
     echo "NUMA: $NUMA_NODES node(s)"
     echo "KWin: $KWIN_RUNNING (0=no, 1=yes)"
     echo "mlock: $MLOCK_OK"
@@ -778,7 +778,7 @@ if test $DETECT_ONLY -eq 1
     for name in $GPU_NAMES
         set -l vram $GPU_VRAMS[(math $idx + 1)]
         set -l cc $GPU_CCS[(math $idx + 1)]
-        echo "  GPU $idx: $name | $vramGB VRAM | sm_$cc"
+        echo "  GPU $idx: $name | $vram GB VRAM | sm_$cc"
         set idx (math $idx + 1)
     end
     if test $GPU_COUNT -eq 0
@@ -796,7 +796,7 @@ echo ""
 echo "📊 SYSTEM DETECTED"
 echo "─────────────────────────────────────────────────────────────"
 echo "🖥️  CPU: $CPU_NAME, $CPU_CORES cores, $CPU_SOCKETS socket(s)"
-echo "💾 RAM: $RAM_GBGB total"
+echo "💾 RAM: $RAM_GB GB total"
 echo "🌐 NUMA: $NUMA_NODES node(s)"
 if test $KWIN_RUNNING -eq 1
     echo "🪟 Compositor: KWin ($VRAM_OVERHEADGB VRAM overhead)"
@@ -815,7 +815,7 @@ for name in $GPU_NAMES
     if string match -q "7.0" "$cc"
         set arch "✅ Volta"
     end
-    echo "   GPU $idx: $name | $vramGB VRAM | sm_$cc $arch"
+    echo "   GPU $idx: $name | $vram GB VRAM | sm_$cc $arch"
     set idx (math $idx + 1)
 end
 if test $GPU_COUNT -eq 0
@@ -826,7 +826,7 @@ echo ""
 echo "📦 MODEL"
 echo "─────────────────────────────────────────────────────────────"
 echo "   Path: $MODEL"
-echo "   Size: $MODEL_GBGB"
+echo "   Size: $MODEL_GB GB"
 if test -n "$PARAMS_DISPLAY"
     echo "   Params: $PARAMS_DISPLAY"
 end
@@ -846,7 +846,7 @@ echo ""
 echo "⚙️  INFERENCE CONFIG"
 echo "─────────────────────────────────────────────────────────────"
 echo "   Type: $INF_TYPE"
-echo "   GPUs: $GPU_COUNT (VRAM: $TOTAL_VRAMGB total, $USABLE_VRAMGB usable)"
+echo "   GPUs: $GPU_COUNT (VRAM: $TOTAL_VRAM GB total, $USABLE_VRAM GB usable)"
 if test $NGL -gt 0
     echo "   GPU Layers: $NGL/99"
 else
