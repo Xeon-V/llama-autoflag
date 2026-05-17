@@ -536,7 +536,6 @@ if test $should_calc_n_gl -eq 1
     if test $NGL_USER_SET -eq 1
         echo "   [User specified -ngl $NGL, skipping auto-calculation]"
     else if test $params_num -gt 0
-    else if test $params_num -gt 0
         # Estimate layer size: model GB / typical layer count
         set -l est_layers 32
         if test $params_num -ge 70
@@ -690,7 +689,13 @@ end
 set -l NUMA_CMD ""
 set -l NUMA_FLAG ""
 if test $NUMA_NODES -gt 1
-    if test $NGL -eq 0; or test $CPU_FALLBACK -eq 1
+    set -l is_cpu_fallback 0
+    if test $NGL -eq 0
+        set is_cpu_fallback 1
+    else if test $CPU_FALLBACK -eq 1
+        set is_cpu_fallback 1
+    end
+    if test $is_cpu_fallback -eq 1; and test $NGL_USER_SET -eq 0
         # CPU-only mode with NUMA distribute for better memory locality
         set NUMA_FLAG "--numa distribute"
         set SAFETY_NOTICES "$SAFETY_NOTICES ℹ NUMA: distribute (CPU-only mode, dual-socket detected)"
