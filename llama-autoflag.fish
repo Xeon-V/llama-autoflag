@@ -251,8 +251,8 @@ function __run_self_test
 end
 
 # ─── Validation ───
-if test -z "$MODEL"
-    echo "❌ Error: Model path required (-m <model.gguf>)"
+if test -z "$MODEL"; and test -z "$SERVER_MODELS_DIR"
+    echo "❌ Error: Model path required (-m <model.gguf>) or --models-dir"
     __print_help
     exit 1
 end
