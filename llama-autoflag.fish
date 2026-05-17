@@ -17,6 +17,8 @@ set -l KV_QUANT ""
 set -l SPEC_TYPE ""
 set -l GPU_MODE "auto"
 set -l DRY_RUN 0
+set -l NGL 0
+set -l NGL_USER_SET 0
 set -l SAVE_PATH ""
 set -l VERBOSE 0
 set -l DETECT_ONLY 0
@@ -467,8 +469,7 @@ end
 # ─── Decision Logic ───
 
 # GPU layers
-set -l NGL 0
-set -l NGL_USER_SET 0
+
 set -l TS ""
 set -l ENV_VARS ""
 set -l EXTRA_FLAGS
