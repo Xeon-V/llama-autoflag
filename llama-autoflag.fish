@@ -505,7 +505,7 @@ if test $MODEL_GB -gt $VRAM_THRESHOLD; and test "$GPU_MODE" = "auto"
 end
 
 # Determine NGL based on model size vs VRAM
-if test $CPU_FALLBACK -eq 0; and test $GPU_COUNT -gt 0; and test "$GPU_MODE" != "none"
+if test $NGL_USER_SET -eq 1; or (test $CPU_FALLBACK -eq 0; and test $GPU_COUNT -gt 0; and test "$GPU_MODE" != "none")
     # Use EFFECTIVE_PARAMS for MoE (active params), otherwise MODEL_PARAMS
     # Defensive: handle empty params
     set -l params_num 0
