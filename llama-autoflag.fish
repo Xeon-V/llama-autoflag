@@ -916,6 +916,7 @@ echo "────────────────────────�
 echo "   Type: $INF_TYPE"
 echo "   GPUs: $GPU_COUNT (VRAM: $TOTAL_VRAM GB total, $USABLE_VRAM GB usable)"
 if test $NGL -gt 0
+echo "DEBUG: NGL=$NGL NGL_USER_SET=$NGL_USER_SET CPU_FALLBACK=$CPU_FALLBACK"
     echo "   GPU Layers: $NGL/99"
 else
     echo "   GPU Layers: 0 (CPU only)"
