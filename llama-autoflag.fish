@@ -527,11 +527,6 @@ if test $CPU_FALLBACK -eq 0; and test $GPU_COUNT -gt 0; and test "$GPU_MODE" != 
             end
         end
     end
-            if test $NGL -lt 10
-                set NGL 10
-            end
-        end
-    end
 end
 
 # Tensor split: asymmetric when KWin compositor detected
