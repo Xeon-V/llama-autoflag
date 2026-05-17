@@ -2,10 +2,12 @@
 
 Auto-detect hardware and generate optimal llama.cpp flags.
 
+**Version: Alpha 3** | For dual NVIDIA TITAN V (sm_70), CUDA 12.9
+
 ## Usage
 
 ```bash
-./llama-autoflag.fish -m ~/models/Qwen3-8B-Q4_K_M.gguf
+./llama-autoflag.fish -m ~/models/Qwen3-8B-Q4_K_M.gguf --dir ~/llama-bee
 ```
 
 ## Options
@@ -13,6 +15,8 @@ Auto-detect hardware and generate optimal llama.cpp flags.
 | Option | Description |
 |--------|-------------|
 | `-m <path>` | Model file (required) |
+| `-d, --draft <path>` | Draft model for speculative decode |
+| `--dir <path>` | llama.cpp build directory (default: ./build) |
 | `-p <text>` | Prompt to run |
 | `-n <n>` | Max tokens (default: 128) |
 | `--temp <n>` | Temperature (default: 0.6) |
@@ -27,20 +31,20 @@ Auto-detect hardware and generate optimal llama.cpp flags.
 ## Examples
 
 ```bash
-# Auto-detect hardware and run
-./llama-autoflag.fish -m ~/models/Qwen3-8B-Q4_K_M.gguf -p "What is AI?"
+# Auto-detect and run
+./llama-autoflag.fish -m ~/models/Qwen3-8B-Q4_K_M.gguf --dir ~/llama-bee
 
 # Dry-run to see flags
-./llama-autoflag.fish -m ~/models/Qwen3-8B-Q4_K_M.gguf --dry-run
+./llama-autoflag.fish -m ~/models/Qwen3-8B-Q4_K_M.gguf --dir ~/llama-bee --dry-run
 
-# Force CPU mode for large models
+# Speculative decode with draft model
+./llama-autoflag.fish -m ~/models/Qwen3-8B-Q4_K_M.gguf -d ~/models/Qwen3-1B-Q4_K_M.gguf
+
+# Force CPU for large models
 ./llama-autoflag.fish -m ~/models/Qwen2.5-72B-Q4_K_M.gguf --cpu
 
-# Multimodal with text mode (GPU OK)
+# Multimodal with text mode
 ./llama-autoflag.fish -m ~/models/Qwen2.5-Omni-7B-Q4_K_M.gguf -t text
-
-# Multimodal with audio mode (CPU only - upstream bug)
-./llama-autoflag.fish -m ~/models/Qwen2.5-Omni-7B-Q4_K_M.gguf -t omni
 
 # Hardware detection only
 ./llama-autoflag.fish --detect-only
@@ -55,8 +59,18 @@ Auto-detect hardware and generate optimal llama.cpp flags.
 - **Tensor split**: Asymmetric 0.55,0.45 when KWin compositor detected
 - **NUMA**: Auto-enables for dual-socket CPUs
 - **Draft validation**: Blocks mismatched architectures for speculative decode
+- **CUDA graphs**: Auto-disables for dual-GPU stability
+- **Custom binary path**: --dir option for llama.cpp directory
 
-## Hardware Requirements
+## Hardware
+
+Tested on:
+- Dual NVIDIA TITAN V (12GB each, sm_70)
+- Intel Xeon E5-2697 v3 (28 cores)
+- 128GB RAM
+- CachyOS (kernel 6.x)
+
+## Requirements
 
 | Component | Minimum |
 |-----------|----------|
