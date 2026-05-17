@@ -66,6 +66,7 @@ while test $i -le (count $argv)
         case '-ngl'
 echo "DEBUG: argv[$i]=$argv[$i]"
             set i (math $i + 1)
+            echo "DEBUG-SET-VAL: i=$i argv[i]=$argv[$i]"
             set -g NGL $argv[$i]
             set -g NGL_USER_SET 1
 echo "DEBUG-ARG-PARSE: Set NGL=$NGL NGL_USER_SET=$NGL_USER_SET"
