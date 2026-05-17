@@ -463,7 +463,7 @@ if test $KWIN_RUNNING -eq 1; and test $GPU_COUNT -gt 1
     # KWin uses ~1-2GB on GPU 1
     set VRAM_OVERHEAD 2
     set USABLE_VRAM (math "$TOTAL_VRAM - $VRAM_OVERHEAD")
-    set SAFETY_NOTICES "$SAFETY_NOTICES ℹ KWin compositor detected — VRAM overhead: ${VRAM_OVERHEAD}GB"
+    set SAFETY_NOTICES "$SAFETY_NOTICES ℹ KWin compositor detected — VRAM overhead: $VRAM_OVERHEADGB"
 end
 
 # VRAM threshold buffer: model > usable-4GB triggers CPU fallback
@@ -471,7 +471,7 @@ end
 set -l VRAM_THRESHOLD (math "$USABLE_VRAM - 4")
 if test $MODEL_GB -gt $VRAM_THRESHOLD; and test "$GPU_MODE" = "auto"
     set CPU_FALLBACK 1
-    set SAFETY_NOTICES "$SAFETY_NOTICES ⚠ Model size ($MODEL_GB GB) exceeds GPU safe threshold ($VRAM_THRESHOLD GB = ${USABLE_VRAM}GB usable - 4GB context)"
+    set SAFETY_NOTICES "$SAFETY_NOTICES ⚠ Model size ($MODEL_GB GB) exceeds GPU safe threshold ($VRAM_THRESHOLD GB = $USABLE_VRAMGB usable - 4GB context)"
 end
 
 # Determine NGL based on model size vs VRAM
@@ -675,7 +675,7 @@ if test -n "$DRAFT_MODEL"
             if test $target_params -gt 0; and test $draft_params -gt 0
                 set -l ratio (math "$target_params / $draft_params")
                 if test $ratio -lt 2; or test $ratio -gt 8
-                    set SAFETY_NOTICES "$SAFETY_NOTICES ⚠ Draft/target ratio: ${ratio}x (optimal: 2-8x)"
+                    set SAFETY_NOTICES "$SAFETY_NOTICES ⚠ Draft/target ratio: $ratiox (optimal: 2-8x)"
                 end
             end
         end
@@ -787,7 +787,7 @@ echo "🖥️  CPU: $CPU_NAME, $CPU_CORES cores, $CPU_SOCKETS socket(s)"
 echo "💾 RAM: {$RAM_GB}GB total"
 echo "🌐 NUMA: $NUMA_NODES node(s)"
 if test $KWIN_RUNNING -eq 1
-    echo "🪟 Compositor: KWin (${VRAM_OVERHEAD}GB VRAM overhead)"
+    echo "🪟 Compositor: KWin ($VRAM_OVERHEADGB VRAM overhead)"
 end
 if test $RT_KERNEL -eq 1
     echo "⚡ Kernel: PREEMPT_RT detected (--mlock disabled)"
