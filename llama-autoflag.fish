@@ -734,7 +734,7 @@ end
 
 # ─── Build Command ───
 set -l CMD "$LLAMA_BIN"
-set -l FLAGS "-m \"$MODEL\""
+set -l FLAGS ""
 
 if test $NGL -gt 0
     set FLAGS "$FLAGS -ngl $NGL"
