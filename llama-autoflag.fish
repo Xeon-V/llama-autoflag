@@ -484,15 +484,12 @@ if test $MODEL_GB -gt $VRAM_THRESHOLD; and test "$GPU_MODE" = "auto"
 end
 
 # Determine NGL based on model size vs VRAM
+# Determine NGL based on model size vs VRAM
 if test $CPU_FALLBACK -eq 0; and test $GPU_COUNT -gt 0; and test "$GPU_MODE" != "none"
-    # Use EFFECTIVE_PARAMS for MoE (active params), otherwise MODEL_PARAMS
-    if test -n "$EFFECTIVE_PARAMS"
-        set -l params_num (echo $EFFECTIVE_PARAMS | tr -d 'B')
-    else if test -n "$MODEL_PARAMS"
-        set -l params_num (echo $MODEL_PARAMS | tr -d 'B')
-    else
-        set params_num 0
-    end
+    # Simpler: offload all layers to GPU
+    set NGL 99
+end
+
     
     if test $params_num -gt 0
         # Estimate layer size: model GB / typical layer count
