@@ -1,9 +1,9 @@
 #!/usr/bin/env fish
 # llama-autoflag.fish — Auto-detects hardware and generates optimal llama.cpp flags
-# Version: 1.0.0
+# Version: 1.3.0
 # Tailored for: Dual NVIDIA TITAN V (sm_70), CUDA 12.9, Driver 580.x, CachyOS
 
-set -l VERSION "1.2.0"
+set -l VERSION "1.3.0"
 set -l PROG_NAME "llama-autoflag"
 set -l LLAMA_DIR "./build"
 set -l LLAMA_BIN "$LLAMA_DIR/build/bin/llama-cli"
@@ -64,13 +64,9 @@ while test $i -le (count $argv)
             set i (math $i + 1)
             set CONTEXT $argv[$i]
         case '-ngl'
-echo "DEBUG: argv[$i]=$argv[$i]"
             set i (math $i + 1)
-            echo "DEBUG-SET-VAL: i=$i argv[i]=$argv[$i]"
             set NGL $argv[$i]
             set NGL_USER_SET 1
-            echo "DEBUG-AFTER-SET: NGL=$NGL"
-echo "DEBUG-ARG-PARSE: Set NGL=$NGL NGL_USER_SET=$NGL_USER_SET"
         case '-q' '--kv-quant'
             set i (math $i + 1)
             set KV_QUANT $argv[$i]
@@ -509,7 +505,6 @@ if test $MODEL_GB -gt $VRAM_THRESHOLD; and test "$GPU_MODE" = "auto"
     set SAFETY_NOTICES "$SAFETY_NOTICES ⚠ Model size ($MODEL_GB GB) exceeds GPU safe threshold ($VRAM_THRESHOLD GB = $USABLE_VRAMGB usable - 4GB context)"
 end
 
-echo "DEBUG-CHECK: should_calc=$should_calc_n_gl NGL=$NGL NGL_USER_SET=$NGL_USER_SET CPU_FALLBACK=$CPU_FALLBACK GPU_COUNT=$GPU_COUNT GPU_MODE=$GPU_MODE"
 # Determine NGL based on model size vs VRAM
 set -l should_calc_n_gl 0
 if test $NGL_USER_SET -eq 1
@@ -538,7 +533,6 @@ if test $should_calc_n_gl -eq 1
         end
     end
     
-    echo "DEBUG-AFTER-SKIP: NGL=$NGL"
 # Skip auto-NGL if user specified -ngl on command line
     if test $NGL_USER_SET -eq 1
         echo "   [User specified -ngl $NGL, skipping auto-calculation]"
@@ -558,7 +552,6 @@ if test $should_calc_n_gl -eq 1
         set -l max_layers (math "floor($USABLE_VRAM / $vram_per_layer)")
 
         if test $max_layers -ge 99
-            echo "DEBUG-SET-99: NGL=$NGL"
 set NGL 99
         else
             set NGL $max_layers
@@ -567,7 +560,6 @@ set NGL 99
         # Fallback: if model < 80% of VRAM, full offload
         set -l ratio (math "$MODEL_GB / $TOTAL_VRAM")
         if test $ratio -lt 0.8
-            echo "DEBUG-SET-99: NGL=$NGL"
 set NGL 99
         else
             set NGL (math "floor(99 * (1 - $ratio) + 10)")
@@ -582,7 +574,6 @@ end
 if test $GPU_COUNT -eq 2; and test $NGL -gt 0
     if test $KWIN_RUNNING -eq 1
         # Give more VRAM to GPU 0 (where KWin doesn't run)
-        echo "DEBUG-AFTER-TS: NGL=$NGL"
 set TS "0.55,0.45"
         set SAFETY_NOTICES "$SAFETY_NOTICES ℹ Tensor split: 0.55,0.45 (KWin detected on GPU 1)"
     else
@@ -926,7 +917,6 @@ echo "────────────────────────�
 echo "   Type: $INF_TYPE"
 echo "   GPUs: $GPU_COUNT (VRAM: $TOTAL_VRAM GB total, $USABLE_VRAM GB usable)"
 if test $NGL -gt 0
-echo "DEBUG: NGL=$NGL NGL_USER_SET=$NGL_USER_SET CPU_FALLBACK=$CPU_FALLBACK"
     echo "   GPU Layers: $NGL/99"
 else
     echo "   GPU Layers: 0 (CPU only)"
