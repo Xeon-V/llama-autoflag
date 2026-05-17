@@ -534,7 +534,8 @@ if test $should_calc_n_gl -eq 1
     
     # Skip auto-NGL if user specified -ngl on command line
     if test $NGL_USER_SET -eq 1
-        echo "   [User specified -ngl, skipping auto-calculation]"
+        echo "   [User specified -ngl $NGL, skipping auto-calculation]"
+    else if test $params_num -gt 0
     else if test $params_num -gt 0
         # Estimate layer size: model GB / typical layer count
         set -l est_layers 32
