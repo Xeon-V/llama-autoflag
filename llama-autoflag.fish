@@ -67,6 +67,7 @@ while test $i -le (count $argv)
             set i (math $i + 1)
             set -g NGL $argv[$i]
             set -g NGL_USER_SET 1
+echo "DEBUG-ARG-PARSE: Set NGL=$NGL NGL_USER_SET=$NGL_USER_SET"
         case '-q' '--kv-quant'
             set i (math $i + 1)
             set KV_QUANT $argv[$i]
