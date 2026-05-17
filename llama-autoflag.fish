@@ -334,11 +334,70 @@ end
 
 # ─── Model Parsing ───
 function parse_model_size
-    # Expand ~ to $HOME
     set -l path $argv[1]
-    if test (string match -rq '~' "$path")
+    if string match -rq '~' "$path"
         set path (string replace -r '^~' "$HOME" "$path")
     end
+
+    set -l filename (basename "$path")
+    set -l params ""
+    set -l active_params ""
+    set -l is_moe 0
+
+    # Parse params from filename - simpler patterns
+    if string match -rq '*A*B*' "$filename"
+        set params (echo "$filename" | grep -oP '\d+B-' | head -1 | tr -d 'B-')
+        set active_params (echo "$filename" | grep -oP 'A\d+B' | tr -d 'AB')
+        set is_moe 1
+    else
+        set params (echo "$filename" | grep -o '\d+B' | tail -1 | tr -d 'B')
+    end
+
+    # Calculate GB estimate
+    set -l gb 4
+    if test -n "$params"
+        set gb (math "$params * 2")
+        if test $gb -lt 1
+            set gb 4
+        end
+    end
+
+    echo "$gb:$params:$active_params:$is_moe"
+end
+
+    
+    set -l filename (basename "$path")
+    set -l params ""
+    set -l active_params ""
+    set -l is_moe 0
+    
+    # Get file size if possible
+    set -l bytes 0
+    if test -f "$path"
+        set bytes (stat -c%s "$path" 2>/dev/null; or echo 0)
+    end
+    
+    # Parse params from filename
+    if string match -rq '.*-A.*B.*' "$filename"
+        set params (string match -r '.*?(\d+)B-' "$filename" | head -1 | string replace 'B-' '')
+        set active_params (string match -r '-A(\d+)B' "$filename" | string replace -r '-A' '')
+        set is_moe 1
+    else
+        set params (string match -r '(\d+)B?' "$filename" | tail -1)
+    end
+    
+    # Calculate GB
+    set -l gb 4
+    if test -n "$params"
+        set gb (math "$params * 2")
+        if test $gb -lt 1
+            set gb 4
+        end
+    end
+    
+    echo "$gb:$params:$active_params:$is_moe"
+end
+
     
     set -l bytes (stat -c%s "$path" 2>/dev/null; or stat -f%z "$path" 2>/dev/null; or echo 0)
     if test "$bytes" = "0"
@@ -484,46 +543,9 @@ if test $MODEL_GB -gt $VRAM_THRESHOLD; and test "$GPU_MODE" = "auto"
 end
 
 # Determine NGL based on model size vs VRAM
-# Determine NGL based on model size vs VRAM
 if test $CPU_FALLBACK -eq 0; and test $GPU_COUNT -gt 0; and test "$GPU_MODE" != "none"
-    # Simpler: offload all layers to GPU
+    # Offload all layers to GPU
     set NGL 99
-end
-
-    
-    if test $params_num -gt 0
-        # Estimate layer size: model GB / typical layer count
-        set -l est_layers 32
-        if test $params_num -ge 70
-            set est_layers 80
-        else if test $params_num -ge 27
-            set est_layers 64
-        else if test $params_num -ge 14
-            set est_layers 48
-        else if test $params_num -ge 8
-            set est_layers 32
-        end
-        # Simple rule: use all GPU layers for most models
-        # Only limit for very large models
-        if test $MODEL_GB -ge 30
-            set NGL 99
-        else
-            set NGL 99
-        end
-    else
-        # Fallback for single GPU: if model < 80% of VRAM, full offload
-        set -l ratio_10 (math "$MODEL_GB * 10 / $TOTAL_VRAM")
-        if test $ratio_10 -lt 8
-            set NGL 99
-        else
-            # Reduce layers proportionally
-            set -l reduction (math "$MODEL_GB * 99 / $TOTAL_VRAM")
-            set NGL (math "99 - $reduction")
-            if test $NGL -lt 10
-                set NGL 10
-            end
-        end
-    end
 end
 
 # Tensor split: asymmetric when KWin compositor detected
