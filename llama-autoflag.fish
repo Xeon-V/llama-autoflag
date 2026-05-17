@@ -63,8 +63,8 @@ while test $i -le (count $argv)
             set CONTEXT $argv[$i]
         case '-ngl'
             set i (math $i + 1)
-            set NGL $argv[$i]
-            set NGL_USER_SET 1
+            set -g NGL $argv[$i]
+            set -g NGL_USER_SET 1
         case '-q' '--kv-quant'
             set i (math $i + 1)
             set KV_QUANT $argv[$i]
