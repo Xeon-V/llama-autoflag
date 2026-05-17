@@ -6,7 +6,7 @@
 set -l VERSION "1.2.0"
 set -l PROG_NAME "llama-autoflag"
 set -l LLAMA_DIR "./build"
-set -l LLAMA_BIN "$LLAMA_DIR/bin/llama-cli"
+set -l LLAMA_BIN "$LLAMA_DIR/build/bin/llama-cli"
 
 # ─── Defaults ───
 set -l MODEL ""
@@ -712,9 +712,9 @@ end
 if test -z "$LLAMA_DIR"
     set -l LLAMA_DIR "./build"
 end
-set -l LLAMA_BIN "$LLAMA_DIR/bin/llama-cli"
+set -l LLAMA_BIN "$LLAMA_DIR/build/bin/llama-cli"
 if test "$INF_TYPE" = "api"
-    set LLAMA_BIN "$LLAMA_DIR/bin/llama-server"
+    set LLAMA_BIN "$LLAMA_DIR/build/bin/llama-server"
 end
 
 # ─── Build Command ───
