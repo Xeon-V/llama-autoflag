@@ -463,7 +463,7 @@ if test $KWIN_RUNNING -eq 1; and test $GPU_COUNT -gt 1
     # KWin uses ~1-2GB on GPU 1
     set VRAM_OVERHEAD 2
     set USABLE_VRAM (math "$TOTAL_VRAM - $VRAM_OVERHEAD")
-    set SAFETY_NOTICES "$SAFETY_NOTICES ℹ KWin compositor detected — VRAM overhead: $VRAM_OVERHEADGB"
+    set SAFETY_NOTICES "$SAFETY_NOTICES ℹ KWin compositor detected — VRAM overhead: $VRAM_OVERHEAD GB"
 end
 
 # VRAM threshold buffer: model > usable-4GB triggers CPU fallback
@@ -799,7 +799,7 @@ echo "🖥️  CPU: $CPU_NAME, $CPU_CORES cores, $CPU_SOCKETS socket(s)"
 echo "💾 RAM: $RAM_GB GB total"
 echo "🌐 NUMA: $NUMA_NODES node(s)"
 if test $KWIN_RUNNING -eq 1
-    echo "🪟 Compositor: KWin ($VRAM_OVERHEADGB VRAM overhead)"
+    echo "🪟 Compositor: KWin ($VRAM_OVERHEAD GB VRAM overhead)"
 end
 if test $RT_KERNEL -eq 1
     echo "⚡ Kernel: PREEMPT_RT detected (--mlock disabled)"
