@@ -28,6 +28,7 @@ set -l TEMP "0.6"
 set -l SERVER_MODELS_DIR ""
 set -l SERVER_PORT 8080
 set -l SPLIT_MODE "layer"
+set -l FLASH_ATTN ""
 
 # ─── Parse Arguments ───
 set -l i 1
@@ -49,6 +50,8 @@ while test $i -le (count $argv)
         case '--split-mode'
             set i (math $i + 1)
             set SPLIT_MODE $argv[$i]
+        case '-fa' '--flash-attn'
+            set FLASH_ATTN "-fa"
         case '-d' '--draft'
             set i (math $i + 1)
             set DRAFT_MODEL $argv[$i]
@@ -109,6 +112,7 @@ function __print_help
     echo "  --models-dir <path>     Auto-discover models for server mode"
     echo "  --port <n>             Server port (default: 8080)"
     echo "  --split-mode <mode>    Split mode: layer|row (default: layer)"
+    echo "  -fa, --flash-attn      Enable Flash Attention (saves VRAM)"
     echo "  -c, --context <n>      Context size in tokens (auto-detect if omitted)"
     echo "  -q, --kv-quant <type>   KV cache quant: q8_0|q4_0|q4_1|fp16|q5_0|q5_1|turbo3"
     echo "  -s, --spec-type <type>  Speculative: dflash|default"
@@ -754,6 +758,10 @@ if test -n "$CACHE_TYPE_K"
 end
 
 set FLAGS "$FLAGS -c $CTX -t $THREADS"
+
+if test -n "$FLASH_ATTN"
+    set FLAGS "$FLAGS -fa"
+end
 
 if test -n "$NO_MMAP"
     set FLAGS "$FLAGS $NO_MMAP"

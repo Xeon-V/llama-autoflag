@@ -197,3 +197,29 @@ curl http://localhost:8081/v1/chat/completions \
 ### Web UI
 
 Open http://localhost:8081/ in browser - dropdown to switch models live!
+
+
+---
+
+## Large Model Workarounds (18GB+ models)
+
+For large models like DeepSeek-R1-32B on dual 12GB Titans:
+
+```bash
+# Option 1: Smaller context + Flash Attention
+fish ./llama-autoflag.fish -m ~/models/DeepSeek-R1-Distill-Qwen-32B-Q4_K_M.gguf --dir ~/llama-bee -c 4096 -fa
+
+# Option 2: Partial GPU offload (~55 layers)
+fish ./llama-autoflag.fish -m ~/models/DeepSeek-R1-Distill-Qwen-32B-Q4_K_M.gguf --dir ~/llama-bee -ngl 55
+
+# Option 3: CPU only (slow but works)
+fish ./llama-autoflag.fish -m ~/models/DeepSeek-R1-Distill-Qwen-32B-Q4_K_M.gguf --dir ~/llama-bee --cpu
+```
+
+### Router Mode with Large Models
+
+```bash
+# Use --models-max 1 to prevent memory bloat
+fish ./llama-autoflag.fish --models-dir ~/models --port 8081 --dir ~/llama-bee --dry-run
+# Add -c 4096 -fa manually to reduce VRAM
+```
