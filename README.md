@@ -2,7 +2,7 @@
 
 Auto-detect hardware and generate optimal llama.cpp flags.
 
-**Version: Alpha 3** | For dual NVIDIA TITAN V (sm_70), CUDA 12.9
+**Version: 1.3.0** | Fix: -ngl manual override preserved
 
 ---
 
@@ -32,6 +32,7 @@ fish ./llama-autoflag.fish -m ~/models/Qwen3-8B-Q4_K_M.gguf --dir ~/llama-bee
 | `-t <type>` | Inference type: text, vision, omni, api | text |
 | `-q <type>` | KV cache: q8_0, q4_0, turbo3 | auto |
 | `-c <n>` | Context size (tokens) | auto |
+| `-ngl <n>` | GPU layers (override auto) | auto |
 | `--cpu` | Force CPU only | GPU if available |
 | `--dry-run` | Show command without running | - |
 | `--detect-only` | Show hardware info only | - |
