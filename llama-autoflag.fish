@@ -5,7 +5,8 @@
 
 set -l VERSION "1.2.0"
 set -l PROG_NAME "llama-autoflag"
-set -l LLAMA_BIN "./build/bin/llama-cli"
+set -l LLAMA_DIR "./build"
+set -l LLAMA_BIN "$LLAMA_DIR/bin/llama-cli"
 
 # ─── Defaults ───
 set -l MODEL ""
@@ -32,7 +33,11 @@ while test $i -le (count $argv)
         case '-m' '--model'
             set i (math $i + 1)
             set MODEL $argv[$i]
-        case '-d' '--draft'
+        case '-d' '--dir'
+            set i (math $i + 1)
+            set LLAMA_DIR $argv[$i]
+            set LLAMA_BIN "$LLAMA_DIR/bin/llama-cli"
+        case '-draft'
             set i (math $i + 1)
             set DRAFT_MODEL $argv[$i]
         case '-t' '--type'
@@ -704,9 +709,10 @@ if test -n "$DRAFT_MODEL"
 end
 
 # Binary selection
-set -l LLAMA_BIN "./build/bin/llama-cli"
+set -l LLAMA_DIR "./build"
+set -l LLAMA_BIN "$LLAMA_DIR/bin/llama-cli"
 if test "$INF_TYPE" = "api"
-    set LLAMA_BIN "./build/bin/llama-server"
+    set LLAMA_BIN "$LLAMA_DIR/bin/llama-server"
 end
 
 # ─── Build Command ───
