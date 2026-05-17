@@ -532,7 +532,8 @@ if test $should_calc_n_gl -eq 1
         end
     end
     
-    # Skip auto-NGL if user specified -ngl on command line
+    echo "DEBUG-AFTER-SKIP: NGL=$NGL"
+# Skip auto-NGL if user specified -ngl on command line
     if test $NGL_USER_SET -eq 1
         echo "   [User specified -ngl $NGL, skipping auto-calculation]"
     else if test $params_num -gt 0
@@ -551,7 +552,8 @@ if test $should_calc_n_gl -eq 1
         set -l max_layers (math "floor($USABLE_VRAM / $vram_per_layer)")
 
         if test $max_layers -ge 99
-            set NGL 99
+            echo "DEBUG-SET-99: NGL=$NGL"
+set NGL 99
         else
             set NGL $max_layers
         end
@@ -559,7 +561,8 @@ if test $should_calc_n_gl -eq 1
         # Fallback: if model < 80% of VRAM, full offload
         set -l ratio (math "$MODEL_GB / $TOTAL_VRAM")
         if test $ratio -lt 0.8
-            set NGL 99
+            echo "DEBUG-SET-99: NGL=$NGL"
+set NGL 99
         else
             set NGL (math "floor(99 * (1 - $ratio) + 10)")
             if test $NGL -lt 10
@@ -573,7 +576,8 @@ end
 if test $GPU_COUNT -eq 2; and test $NGL -gt 0
     if test $KWIN_RUNNING -eq 1
         # Give more VRAM to GPU 0 (where KWin doesn't run)
-        set TS "0.55,0.45"
+        echo "DEBUG-AFTER-TS: NGL=$NGL"
+set TS "0.55,0.45"
         set SAFETY_NOTICES "$SAFETY_NOTICES ℹ Tensor split: 0.55,0.45 (KWin detected on GPU 1)"
     else
         set TS "0.5,0.5"
