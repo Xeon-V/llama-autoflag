@@ -33,11 +33,11 @@ while test $i -le (count $argv)
         case '-m' '--model'
             set i (math $i + 1)
             set MODEL $argv[$i]
-        case '-d' '--dir'
+        case '--dir'
             set i (math $i + 1)
             set LLAMA_DIR $argv[$i]
             set LLAMA_BIN "$LLAMA_DIR/bin/llama-cli"
-        case '-draft'
+        case '-d' '--draft'
             set i (math $i + 1)
             set DRAFT_MODEL $argv[$i]
         case '-t' '--type'
