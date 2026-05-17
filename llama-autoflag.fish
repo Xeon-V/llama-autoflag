@@ -477,12 +477,18 @@ end
 # Determine NGL based on model size vs VRAM
 if test $CPU_FALLBACK -eq 0; and test $GPU_COUNT -gt 0; and test "$GPU_MODE" != "none"
     # Use EFFECTIVE_PARAMS for MoE (active params), otherwise MODEL_PARAMS
+    # Defensive: handle empty params
+    set -l params_num 0
     if test -n "$EFFECTIVE_PARAMS"
-        set -l params_num (echo $EFFECTIVE_PARAMS | tr -d 'B')
+        set -l tmp (echo "$EFFECTIVE_PARAMS" | tr -d 'B')
+        if test -n "$tmp"
+            set params_num $tmp
+        end
     else if test -n "$MODEL_PARAMS"
-        set -l params_num (echo $MODEL_PARAMS | tr -d 'B')
-    else
-        set params_num 0
+        set -l tmp (echo "$MODEL_PARAMS" | tr -d 'B')
+        if test -n "$tmp"
+            set params_num $tmp
+        end
     end
     
     if test $params_num -gt 0
@@ -582,12 +588,18 @@ if test -n "$KV_QUANT"
     set CACHE_TYPE_V $KV_QUANT
 else
     # Use EFFECTIVE_PARAMS for MoE
+    # Defensive: handle empty params
+    set -l params_num 0
     if test -n "$EFFECTIVE_PARAMS"
-        set -l params_num (echo $EFFECTIVE_PARAMS | tr -d 'B')
+        set -l tmp (echo "$EFFECTIVE_PARAMS" | tr -d 'B')
+        if test -n "$tmp"
+            set params_num $tmp
+        end
     else if test -n "$MODEL_PARAMS"
-        set -l params_num (echo $MODEL_PARAMS | tr -d 'B')
-    else
-        set params_num 0
+        set -l tmp (echo "$MODEL_PARAMS" | tr -d 'B')
+        if test -n "$tmp"
+            set params_num $tmp
+        end
     end
     
     # 3-tier TurboQuant safety
