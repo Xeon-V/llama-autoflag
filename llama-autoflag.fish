@@ -25,6 +25,9 @@ set -l REPORT 0
 set -l PROMPT ""
 set -l NUM_TOKENS 128
 set -l TEMP "0.6"
+set -l SERVER_MODELS_DIR ""
+set -l SERVER_PORT 8080
+set -l SPLIT_MODE "layer"
 
 # ─── Parse Arguments ───
 set -l i 1
@@ -36,7 +39,16 @@ while test $i -le (count $argv)
         case '--dir'
             set i (math $i + 1)
             set LLAMA_DIR $argv[$i]
-            set LLAMA_BIN "$LLAMA_DIR/bin/llama-cli"
+            set LLAMA_BIN "$LLAMA_DIR/build/bin/llama-cli"
+        case '--models-dir'
+            set i (math $i + 1)
+            set SERVER_MODELS_DIR $argv[$i]
+        case '--port'
+            set i (math $i + 1)
+            set SERVER_PORT $argv[$i]
+        case '--split-mode'
+            set i (math $i + 1)
+            set SPLIT_MODE $argv[$i]
         case '-d' '--draft'
             set i (math $i + 1)
             set DRAFT_MODEL $argv[$i]
@@ -94,6 +106,9 @@ function __print_help
     echo "  -m, --model <path>      Model file (required)"
     echo "  -d, --draft <path>      Draft model for speculative decode"
     echo "  -t, --type <type>       Inference type: text|vision|omni|api|batch (default: text)"
+    echo "  --models-dir <path>     Auto-discover models for server mode"
+    echo "  --port <n>             Server port (default: 8080)"
+    echo "  --split-mode <mode>    Split mode: layer|row (default: layer)"
     echo "  -c, --context <n>      Context size in tokens (auto-detect if omitted)"
     echo "  -q, --kv-quant <type>   KV cache quant: q8_0|q4_0|q4_1|fp16|q5_0|q5_1|turbo3"
     echo "  -s, --spec-type <type>  Speculative: dflash|default"
@@ -713,7 +728,7 @@ if test -z "$LLAMA_DIR"
     set -l LLAMA_DIR "./build"
 end
 set -l LLAMA_BIN "$LLAMA_DIR/build/bin/llama-cli"
-if test "$INF_TYPE" = "api"
+if test "$INF_TYPE" = "api"; or test -n "$SERVER_MODELS_DIR"
     set LLAMA_BIN "$LLAMA_DIR/build/bin/llama-server"
 end
 
@@ -755,8 +770,14 @@ if test -n "$NGLD"
     set FLAGS "$FLAGS $NGLD"
 end
 
-if test "$INF_TYPE" = "api"
-    set FLAGS "$FLAGS --parallel 4 -b $BATCH -ub $UBATCH --host 0.0.0.0 --port 8080"
+if test "$INF_TYPE" = "api"; or test -n "$SERVER_MODELS_DIR"
+    set FLAGS "$FLAGS --parallel 4 -b $BATCH -ub $UBATCH --host 0.0.0.0 --port $SERVER_PORT"
+    if test -n "$SERVER_MODELS_DIR"
+        set FLAGS "$FLAGS --models-dir $SERVER_MODELS_DIR"
+    end
+    if test "$SPLIT_MODE" = "row"
+        set FLAGS "$FLAGS -sm row"
+    end
 else
     set FLAGS "$FLAGS -b $BATCH -ub $UBATCH"
 end
