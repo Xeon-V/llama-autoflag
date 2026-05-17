@@ -64,6 +64,7 @@ while test $i -le (count $argv)
         case '-ngl'
             set i (math $i + 1)
             set NGL $argv[$i]
+            set NGL_USER_SET 1
         case '-q' '--kv-quant'
             set i (math $i + 1)
             set KV_QUANT $argv[$i]
@@ -467,6 +468,7 @@ end
 
 # GPU layers
 set -l NGL 0
+set -l NGL_USER_SET 0
 set -l TS ""
 set -l ENV_VARS ""
 set -l EXTRA_FLAGS
@@ -519,7 +521,10 @@ if test $CPU_FALLBACK -eq 0; and test $GPU_COUNT -gt 0; and test "$GPU_MODE" != 
         end
     end
     
-    if test $params_num -gt 0
+    # Skip auto-NGL if user specified -ngl on command line
+    if test $NGL_USER_SET -eq 1
+        echo "   [User specified -ngl, skipping auto-calculation]"
+    else if test $params_num -gt 0
         # Estimate layer size: model GB / typical layer count
         set -l est_layers 32
         if test $params_num -ge 70
