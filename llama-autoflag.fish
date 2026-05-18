@@ -802,7 +802,11 @@ if not set -q LLAMA_DIR; or test -z "$LLAMA_DIR"
 end
 
 # Make relative paths absolute (resolve from current directory)
-set -l LLAMA_DIR (realpath "$LLAMA_DIR" 2>/dev/null; or echo "$LLAMA_DIR")
+# Use abspath or realpath if available, otherwise use as-is
+set -l REALPATH_CMD (which realpath 2>/dev/null; or which abspath 2>/dev/null; or echo "")
+if test -n "$REALPATH_CMD"
+    set LLAMA_DIR ($REALPATH_CMD "$LLAMA_DIR" 2>/dev/null; or echo "$LLAMA_DIR")
+end
 
 # Rebuild binary path only if using default, preserve user-set for custom builds
 if test "$LLAMA_DIR" = "./build"
