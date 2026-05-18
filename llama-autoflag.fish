@@ -261,6 +261,12 @@ function __run_self_test
     end
 end
 
+# ─── Early Exit for Flags ───
+if test $DETECT_ONLY -eq 1
+    echo "llama-autoflag v$VERSION — Hardware Detection"
+    exit 0
+end
+
 # ─── Validation ───
 if test -z "$MODEL"; and test -z "$SERVER_MODELS_DIR"
     echo "❌ Error: Model path required (-m <model.gguf>) or --models-dir"
