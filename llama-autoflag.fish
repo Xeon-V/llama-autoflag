@@ -850,7 +850,7 @@ if test $SELF_TEST -eq 1
     exit 0
 end
 
-# Handle --detect-running
+# ─── Detect Running Handler (before validation) ───
 if test $DETECT_RUNNING -eq 1
     echo "📡 Querying llama-server router..."
     set -l URL "http://localhost:8080"
@@ -869,7 +869,7 @@ if test $DETECT_RUNNING -eq 1
     exit 0
 end
 
-# Handle --detect-only
+# ─── Validation ───
 if test $DETECT_ONLY -eq 1
     echo "llama-autoflag v$VERSION — Hardware Detection"
     echo "============================================"
