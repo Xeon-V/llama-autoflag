@@ -22,6 +22,7 @@ set -l NGL_USER_SET 0
 set -l SAVE_PATH ""
 set -l VERBOSE 0
 set -l DETECT_ONLY 0
+set -l DETECT_RUNNING 0
 set -l SELF_TEST 0
 set -l REPORT 0
 set -l PROMPT ""
@@ -96,6 +97,8 @@ while test $i -le (count $argv)
             set VERBOSE 1
         case '--detect-only'
             set DETECT_ONLY 1
+        case '--detect-running'
+            set DETECT_RUNNING 1
         case '--self-test'
             set SELF_TEST 1
         case '--report'
@@ -130,6 +133,7 @@ function __print_help
     echo "  --cpu                   Force CPU-only mode"
     echo "  --dry-run               Print flags without executing"
     echo "  --detect-only           Only detect and show hardware"
+    echo "  --detect-running      Query running router"
     echo "  --self-test            Run self-test (math, parsing, shell)"
     echo "  --report               Generate test report for GitHub issues"
     echo "  --save <path>          Save command to file"
@@ -843,6 +847,25 @@ end
 # Handle --self-test
 if test $SELF_TEST -eq 1
     __run_self_test
+    exit 0
+end
+
+# Handle --detect-running
+if test $DETECT_RUNNING -eq 1
+    echo "📡 Querying llama-server router..."
+    set -l URL "http://localhost:8080"
+    set -l JSON (curl -s "$URL/models")
+    if test -z "$JSON"
+        echo "❌ Cannot connect to router"
+        exit 1
+    end
+    echo ""
+    echo "🎯 Running Models:"
+    echo "─────────────────────────────────────────────────────────────"
+    set -l TMP (mktemp)
+    echo "$JSON" > $TMP
+    python3 (status dirname)/llama-autoflag-detect.py $TMP
+    rm -f $TMP
     exit 0
 end
 
