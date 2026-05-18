@@ -581,6 +581,8 @@ set TS "0.55,0.45"
     end
     set -a ENV_VARS "GGML_CUDA_DISABLE_GRAPHS=1"
     set -a ENV_VARS "CUDA_MODULE_LOADING=LAZY"
+    # sm70 (Volta) - use GGML's quant kernels (no INT8 Tensor Cores)
+    set -a ENV_VARS "GGML_CUDA_FORCE_MMQ=1"
 else if test $GPU_COUNT -gt 2
     set -l ts_str ""
     set -l ts_val (math "1.0 / $GPU_COUNT")
@@ -709,6 +711,20 @@ end
 # Batch sizes
 set -l BATCH 512
 set -l UBATCH 512
+
+# Cap batch size for dual GPU without NVLink (PCIe 3.0 bandwidth limit)
+if test $GPU_COUNT -ge 2
+    # Check if NVLink present (Titan V typically has no NVLink)
+    set -l nvlink_check (nvidia-smi nvlink --status 2>/dev/null)
+    if test -z "$nvlink_check"
+        # No NVLink - cap at 2048 to prevent PCIe saturation
+        if test $BATCH -gt 2048
+            set BATCH 2048
+            set UBATCH 1024
+        end
+    end
+end
+
 if test "$INF_TYPE" = "vision"; or test "$INF_TYPE" = "omni"
     set BATCH 256
     set UBATCH 256
