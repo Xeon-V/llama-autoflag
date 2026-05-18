@@ -103,6 +103,9 @@ while test $i -le (count $argv)
             set DETECT_RUNNING 1
         case '--preload'
             set PRELOAD_MODEL 1
+        case '--preload-model'
+            set i (math $i + 1)
+            set PRELOAD_MODEL_NAME $argv[$i]
         case '--self-test'
             set SELF_TEST 1
         case '--report'
@@ -1119,7 +1122,15 @@ if test -n "$SERVER_MODELS_DIR"
     # Preload first model for dropdown (wait for server startup)
     if test "$PRELOAD_MODEL" = "1"
         sleep 5
-        set -l FIRST_MODEL (curl -s http://localhost:8080/v1/models 2>/dev/null | python3 -c "import json,sys; m=json.load(sys.stdin); print(m['data'][0]['id'])" 2>/dev/null)
+        # Use specified model or find small one
+        if test -n "$PRELOAD_MODEL_NAME"
+            set FIRST_MODEL "$PRELOAD_MODEL_NAME"
+        else
+            set -l FIRST_MODEL (curl -s http://localhost:8080/v1/models 2>/dev/null | python3 -c "import json,sys; [print(m['id']) for m in json.load(sys.stdin)['data'] if '0.5b' in m['id'] or '1b' in m['id']]" 2>/dev/null)
+            if test -z "$FIRST_MODEL"
+                set FIRST_MODEL (curl -s http://localhost:8080/v1/models 2>/dev/null | python3 -c "import json,sys; print(json.load(sys.stdin)['data'][0]['id'])" 2>/dev/null)
+            end
+        end
         if test -n "$FIRST_MODEL"
             echo "[autoflag] Pre-loading: $FIRST_MODEL"
             curl -s http://localhost:8080/v1/chat/completions \
