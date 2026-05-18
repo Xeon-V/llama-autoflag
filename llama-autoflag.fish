@@ -5,7 +5,7 @@
 
 set -l VERSION "1.3.0"
 set -l PROG_NAME "llama-autoflag"
-set -l LLAMA_DIR "./build"
+set -l LLAMA_DIR "./build"  # default, may be overridden by --llama-dir
 set -l LLAMA_BIN "$LLAMA_DIR/bin/llama-cli"
 
 # ─── Defaults ───
@@ -794,12 +794,23 @@ if test -n "$DRAFT_MODEL"
 end
 
 # Binary selection (skip if already set via --dir)
-if test -z "$LLAMA_DIR"
+# Only set default LLAMA_DIR if not already set (don't override --llama-dir argument)
+if not set -q LLAMA_DIR; or test -z "$LLAMA_DIR"
     set -l LLAMA_DIR "./build"
 end
-set -l LLAMA_BIN "$LLAMA_DIR/bin/llama-cli"
-if test "$INF_TYPE" = "api"; or test -n "$SERVER_MODELS_DIR"
-    set LLAMA_BIN "$LLAMA_DIR/bin/llama-server"
+
+# Rebuild binary path only if using default, preserve user-set for custom builds
+if test "$LLAMA_DIR" = "./build"
+    set -l LLAMA_BIN "$LLAMA_DIR/bin/llama-cli"
+    if test "$INF_TYPE" = "api"; or test -n "$SERVER_MODELS_DIR"
+        set LLAMA_BIN "$LLAMA_DIR/bin/llama-server"
+    end
+else
+    # Use user-provided LLAMA_DIR with known binary locations
+    set -l LLAMA_BIN "$LLAMA_DIR/bin/llama-cli"
+    if test "$INF_TYPE" = "api"; or test -n "$SERVER_MODELS_DIR"
+        set LLAMA_BIN "$LLAMA_DIR/bin/llama-server"
+    end
 end
 
 # ─── Build Command ───
