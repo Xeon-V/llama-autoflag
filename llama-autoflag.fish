@@ -764,7 +764,7 @@ if test -n "$DRAFT_MODEL"
         else
             set SPEC_FLAGS "--spec-type dflash"
         end
-        set SPEC_FLAGS "$SPEC_FLAGS -md \"$DRAFT_MODEL\" --draft 16 --draft-min 4 --draft-p-split 0.5"
+        set SPEC_FLAGS "$SPEC_FLAGS -md \"$DRAFT_MODEL\" --draft 16 --draft-min 4 --draft-p-split 0.10"
         set NGLD "-ngld 99"
         set SAFETY_NOTICES "$SAFETY_NOTICES ✓ Architecture match: $MODEL_FAMILY -> $DRAFT_FAMILY"
     end
@@ -827,7 +827,7 @@ if test -n "$NGLD"
 end
 
 if test "$INF_TYPE" = "api"; or test -n "$SERVER_MODELS_DIR"
-    set FLAGS "$FLAGS --parallel 4 -b $BATCH -ub $UBATCH --host 0.0.0.0 --port $SERVER_PORT"
+    set FLAGS "$FLAGS -cb --parallel 4 -b $BATCH -ub $UBATCH --host 0.0.0.0 --port $SERVER_PORT"
     if test -n "$SERVER_MODELS_DIR"
         set FLAGS "$FLAGS --models-dir $SERVER_MODELS_DIR"
     end
