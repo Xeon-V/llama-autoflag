@@ -764,7 +764,7 @@ if test -n "$DRAFT_MODEL"
         else
             set SPEC_FLAGS "--spec-type dflash"
         end
-        set SPEC_FLAGS "$SPEC_FLAGS --model-draft \"$DRAFT_MODEL\" --draft-max 15 --draft-min 1"
+        set SPEC_FLAGS "$SPEC_FLAGS -md \"$DRAFT_MODEL\" --draft 16 --draft-min 4 --draft-p-split 0.5"
         set NGLD "-ngld 99"
         set SAFETY_NOTICES "$SAFETY_NOTICES ✓ Architecture match: $MODEL_FAMILY -> $DRAFT_FAMILY"
     end
