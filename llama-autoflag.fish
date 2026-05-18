@@ -265,6 +265,25 @@ function __run_self_test
     end
 end
 
+# Quick exit for detect-running (before validation)
+if test $DETECT_RUNNING -eq 1
+    echo "📡 Querying llama-server router..."
+    set -l URL "http://localhost:8080"
+    set -l JSON (curl -s "$URL/models" 2>/dev/null)
+    if test -z "$JSON"
+        echo "❌ Cannot connect to router"
+        exit 1
+    end
+    echo ""
+    echo "🎯 Running Models:"
+    echo "─────────────────────────────────────────────────────────────"
+    set -l TMP (mktemp)
+    echo "$JSON" > $TMP
+    python3 (status dirname)/llama-autoflag-detect.py $TMP
+    rm -f $TMP
+    exit 0
+end
+
 # ─── Validation ───
 if test $DETECT_ONLY -ne 1; and test -z "$MODEL"; and test -z "$SERVER_MODELS_DIR"
     echo "❌ Error: Model path required (-m <model.gguf>) or --models-dir"
