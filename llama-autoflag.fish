@@ -101,6 +101,8 @@ while test $i -le (count $argv)
             set DETECT_ONLY 1
         case '--detect-running'
             set DETECT_RUNNING 1
+        case '--preload'
+            set PRELOAD_MODEL 1
         case '--self-test'
             set SELF_TEST 1
         case '--report'
@@ -1108,4 +1110,26 @@ echo ""
 
 # Actually execute
 echo "[autoflag] Executing..."
-eval $FULL_CMD
+
+# Run server in background for router mode with preload support
+if test -n "$SERVER_MODELS_DIR"
+    eval $FULL_CMD &
+    set SERVER_PID $LASTPID
+    
+    # Preload first model for dropdown (wait for server startup)
+    if test "$PRELOAD_MODEL" = "1"
+        sleep 5
+        set -l FIRST_MODEL (curl -s http://localhost:8080/v1/models 2>/dev/null | python3 -c "import json,sys; m=json.load(sys.stdin); print(m['data'][0]['id'])" 2>/dev/null)
+        if test -n "$FIRST_MODEL"
+            echo "[autoflag] Pre-loading: $FIRST_MODEL"
+            curl -s http://localhost:8080/v1/chat/completions \
+                -H "Content-Type: application/json" \
+                -d "{\"model\":\"$FIRST_MODEL\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}],\"max_tokens\":1}" >/dev/null 2>&1 &
+        end
+    end
+    
+    # Wait for server
+    wait $SERVER_PID
+else
+    eval $FULL_CMD
+end
