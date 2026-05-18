@@ -43,7 +43,9 @@ while test $i -le (count $argv)
         case '--dir'
             set i (math $i + 1)
             set LLAMA_DIR $argv[$i]
-            set LLAMA_BIN "$LLAMA_DIR/bin/llama-cli"
+        case '--llama-dir'
+            set i (math $i + 1)
+            set LLAMA_DIR $argv[$i]
         case '--models-dir'
             set i (math $i + 1)
             set SERVER_MODELS_DIR $argv[$i]
@@ -798,6 +800,9 @@ end
 if not set -q LLAMA_DIR; or test -z "$LLAMA_DIR"
     set -l LLAMA_DIR "./build"
 end
+
+# Make relative paths absolute (resolve from current directory)
+set -l LLAMA_DIR (realpath "$LLAMA_DIR" 2>/dev/null; or echo "$LLAMA_DIR")
 
 # Rebuild binary path only if using default, preserve user-set for custom builds
 if test "$LLAMA_DIR" = "./build"
