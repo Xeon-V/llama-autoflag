@@ -181,12 +181,12 @@ end
 set CTX $CONTEXT
 if test $CTX -eq 0
     if test "$family" = "qwen"
-        set CTX 16384
+        set CTX 8192
     else if test "$family" = "deepseek"
         if test $is_reasoning -eq 1
             set CTX 32768
         else
-            set CTX 16384
+            set CTX 8192
         end
     else if test "$family" = "gemma"
         set CTX 8192
