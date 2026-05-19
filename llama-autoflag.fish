@@ -1,9 +1,9 @@
 #!/usr/bin/env fish
 # llama-autoflag.fish — Auto-detects hardware and generates optimal llama.cpp flags
-# Version: 1.4.0
+# Version: 1.4.1
 # Tailored for: Dual NVIDIA TITAN V (sm_70), CUDA 12.9, Driver 580.x, CachyOS
 
-set -l VERSION "1.4.0"
+set -l VERSION "1.4.1"
 set -l PROG_NAME "llama-autoflag"
 set -l LLAMA_DIR "./build"  # default, may be overridden by --llama-dir
 set -l LLAMA_EXE ""  # optional: override full path to binary (e.g., /path/to/llama-server)
