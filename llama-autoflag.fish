@@ -8,7 +8,7 @@ if test -z "$model"
     exit 1
 end
 
-# Hardware detection (handles empty results)
+# Hardware detection
 set gpu_count (nvidia-smi --query-gpu=count --format=csv,noheader 2>/dev/null | head -1 | string trim)
 if test -z "$gpu_count"
     set gpu_count 0
@@ -27,42 +27,39 @@ end
 set flags "-m $model"
 
 # GPU offload
-if test "$gpu_count" -gt 0 2>/dev/null
+if test "$gpu_count" -gt 0
     set flags "$flags -ngl 999"
-
-    # Multi-GPU: use graph split mode
-    if test "$gpu_count" -ge 2 2>/dev/null
+    if test "$gpu_count" -ge 2
         set flags "$flags -sm graph"
     end
 end
 
-# Context size detection (case-insensitive)
-if string match -ri "*Qwen3*" $model 2>/dev/null
+# Context size detection - lowercase comparison
+set model_lower (echo $model | tr '[:upper:]' '[:lower:]')
+if echo $model_lower | grep -q "qwen3"
     set flags "$flags -c 16384"
-else if string match -ri "*Omni*" $model 2>/dev/null
+else if echo $model_lower | grep -q "omni"
     set flags "$flags -c 32768"
-else if string match -ri "*DeepSeek*" $model 2>/dev/null
+else if echo $model_lower | grep -q "deepseek"
     set flags "$flags -c 16384"
 else
     set flags "$flags -c 4096"
 end
 
-# Flash Attention + KV quant
 set flags "$flags -fa on -ctk q8_0 -ctv q8_0"
 
-# MLA for DeepSeek (Ampere+ GPUs)
-if string match -ri "*DeepSeek*" $model 2>/dev/null
-    if test "$gpu_arch" -ge 80 2>/dev/null
+# MLA for DeepSeek
+if echo $model_lower | grep -q "deepseek"
+    if test "$gpu_arch" -ge 80
         set flags "$flags -mla 3 -khad -vhad"
     end
 end
 
 # MoE detection
-if string match -ri "*moe*" $model 2>/dev/null
+if echo $model_lower | grep -q "moe"
     set flags "$flags -fmoe -ooae"
 end
 
-# Thread count + performance options
 set flags "$flags -t $cpu_threads -gr -muge 0"
 
 echo $flags
