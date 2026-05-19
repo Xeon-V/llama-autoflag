@@ -1,0 +1,25 @@
+#!/bin/bash
+model="$1"
+[ -z "$model" ] && echo "Usage: $0 <model.gguf>" && exit 1
+gpu_count=$(nvidia-smi --query-gpu=count --format=csv,noheader 2>/dev/null | head -1 | tr -d ' ' || echo 0)
+gpu_arch=$(nvidia-smi --query-gpu=compute_cap --format=csv,noheader 2>/dev/null | head -1 | tr -d '.' || echo 0)
+cpu_threads=$(nproc 2>/dev/null || echo 4)
+gpu_count=${gpu_count:-0}
+gpu_arch=${gpu_arch:-0}
+flags="-m $model"
+[ "$gpu_count" -gt 0 ] 2>/dev/null && flags="$flags -ngl 999"
+[ "$gpu_count" -ge 2 ] 2>/dev/null && flags="$flags -sm graph"
+model_lower=$(echo "$model" | tr '[:upper:]' '[:lower:]')
+case "$model_lower" in
+    *qwen3*) flags="$flags -c 16384";;
+    *omni*) flags="$flags -c 32768";;
+    *deepseek*) flags="$flags -c 16384";;
+    *) flags="$flags -c 4096";;
+esac
+flags="$flags -fa on -ctk q8_0 -ctv q8_0"
+if echo "$model_lower" | grep -q "deepseek"; then
+    [ "$gpu_arch" -ge 80 ] 2>/dev/null && flags="$flags -mla 3 -khad -vhad"
+fi
+echo "$model_lower" | grep -q "moe" && flags="$flags -fmoe -ooae"
+flags="$flags -t $cpu_threads -gr -muge 0"
+echo "$flags"
