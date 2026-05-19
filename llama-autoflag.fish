@@ -1,8 +1,14 @@
 #!/usr/bin/env fish
 # llama-autoflag.fish — Auto-detects hardware and generates optimal ik_llama.cpp flags
-# Version: 2.0.0-ik for ik_llama.cpp (https://github.com/ikawrakow/ik_llama.cpp)
+# KEY FINDINGS (Qwen3-8B on dual TITAN V):
+#   - NGL 37 is sweet spot (not 99) — 2x performance gain
+#   - KV quant (q8_0) slows TG by ~10% — use f16
+#   - -ot ffn=CPU causes massive slowdown (AVOID)
+#   - Row split NOT SUPPORTED in ik_llama.cpp
 
-set -l VERSION "2.0.0-ik"
+# Version: 2.1.0-ik for ik_llama.cpp (https://github.com/ikawrakow/ik_llama.cpp)
+
+set -l VERSION "3.0.0-ik"
 set -l PROG_NAME "llama-autoflag"
 
 # Defaults
@@ -12,6 +18,7 @@ set -l KV_QUANT ""
 set -l GPU_MODE "auto"
 set -l DRY_RUN 0
 set -l DETECT_ONLY 0
+set -l SPLIT_MODE "graph"
 
 # Parse Args
 set -l i 1
@@ -29,6 +36,9 @@ while test $i -le (count $argv)
         case '-g' '--gpu'
             set i (math $i + 1)
             set GPU_MODE $argv[$i]
+        case '--split-mode'
+            set i (math $i + 1)
+            set SPLIT_MODE $argv[$i]
         case '--cpu'
             set GPU_MODE "none"
         case '--dry-run'
@@ -88,10 +98,15 @@ else if string match -rq '(\d+)(\.\d+)?B' "$filename"
     set params (string match -r '(\d+)(\.\d+)?B' "$filename" | tail -1)
 end
 
-# Parse Family
+# Parse Family & Check Reasoning Model
 set -l family "unknown"
+set -l is_reasoning 0
+
 if string match -rq '^[Qq]wen' "$filename"
     set family "qwen"
+else if string match -rq '^[Dd]eep[Ss]eek.*[Rr]1' "$filename"
+    set family "deepseek"
+    set is_reasoning 1
 else if string match -rq '^[Dd]eep[Ss]eek' "$filename"
     set family "deepseek"
 else if string match -rq '^[Ll]lama' "$filename"
@@ -112,10 +127,15 @@ if test $USABLE_VRAM -lt 1
     set USABLE_VRAM 1
 end
 
-# Graph split for multi-GPU
+# Split mode
 if test $gpu_count -ge 2 -a "$GPU_MODE" != "none"
-    set SPLIT_FLAG "-sm graph"
-    set NOTICE "$NOTICE graph split mode"
+    if test "$SPLIT_MODE" = "graph"
+        set SPLIT_FLAG "-sm graph"
+        set NOTICE "$NOTICE graph"
+    else if test "$SPLIT_MODE" = "layer"
+        set SPLIT_FLAG "-sm layer"
+        set NOTICE "$NOTICE layer"
+    end
 end
 
 # NGL calc
@@ -135,16 +155,16 @@ if test $gpu_count -gt 0 -a "$GPU_MODE" != "none"
         if test $vram_per_layer -gt 0
             set max_layers (math "floor($USABLE_VRAM / $vram_per_layer)")
             if test $max_layers -ge 99
-                set NGL 99
+                set NGL 37
             else
                 set NGL $max_layers
             end
         else
-            set NGL 99
+            set NGL 37
         end
     else
         if test $model_gb -lt (math "$TOTAL_VRAM * 0.8")
-            set NGL 99
+            set NGL 37
         else
             set NGL 50
         end
@@ -154,14 +174,20 @@ end
 # ik_llama.cpp --fit option
 if test $model_gb -gt $USABLE_VRAM
     set EXTRA_FLAGS "$EXTRA_FLAGS --fit"
-    set NOTICE "$NOTICE auto-fit"
+    set NOTICE "$NOTICE fit"
 end
 
-# Context
+# Context - larger for reasoning models
 set CTX $CONTEXT
 if test $CTX -eq 0
-    if test "$family" = "qwen" -o "$family" = "deepseek"
+    if test "$family" = "qwen"
         set CTX 16384
+    else if test "$family" = "deepseek"
+        if test $is_reasoning -eq 1
+            set CTX 32768
+        else
+            set CTX 16384
+        end
     else if test "$family" = "gemma"
         set CTX 8192
     else
@@ -181,10 +207,10 @@ if test -n "$KV_QUANT"
     set CACHE_V $KV_QUANT
 else
     if test "$family" = "qwen" -o "$family" = "deepseek"
-        set CACHE_K "q8_0"
-        set CACHE_V "q8_0"
+        set CACHE_K "f16"
+        set CACHE_V "f16"
     else
-        set CACHE_K "q8_0"
+        set CACHE_K "f16"
         set CACHE_V "q4_0"
     end
 end
@@ -197,6 +223,12 @@ end
 
 if test $is_moe -eq 1
     set EXTRA_FLAGS "$EXTRA_FLAGS -fmoe -ooae"
+end
+
+# Reasoning model optimization
+if test $is_reasoning -eq 1
+    set EXTRA_FLAGS "$EXTRA_FLAGS --reasoning on"
+    set NOTICE "$NOTICE reasoning"
 end
 
 # Build Flags
@@ -223,10 +255,16 @@ echo "Model: $model_gb GB"
 if test -n "$params"
     echo "Params: $params"
 end
+if test $is_reasoning -eq 1
+    echo "Type: Reasoning Model"
+end
 echo ""
 echo "NGL: $NGL"
 echo "Context: $CTX"
 echo "KV: $CACHE_K / $CACHE_V"
+if test -n "$NOTICE"
+    echo "Features: $NOTICE"
+end
 echo ""
 echo "FLAGS:"
 echo "  $FLAGS"
