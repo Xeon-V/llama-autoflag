@@ -1,25 +1,332 @@
 #!/bin/bash
-model="$1"
-[ -z "$model" ] && echo "Usage: $0 <model.gguf>" && exit 1
-gpu_count=$(nvidia-smi --query-gpu=count --format=csv,noheader 2>/dev/null | head -1 | tr -d ' ' || echo 0)
-gpu_arch=$(nvidia-smi --query-gpu=compute_cap --format=csv,noheader 2>/dev/null | head -1 | tr -d '.' || echo 0)
-cpu_threads=$(nproc 2>/dev/null || echo 4)
-gpu_count=${gpu_count:-0}
-gpu_arch=${gpu_arch:-0}
-flags="-m $model"
-[ "$gpu_count" -gt 0 ] 2>/dev/null && flags="$flags -ngl 999"
-[ "$gpu_count" -ge 2 ] 2>/dev/null && flags="$flags -sm graph"
-model_lower=$(echo "$model" | tr '[:upper:]' '[:lower:]')
-case "$model_lower" in
-    *qwen3*) flags="$flags -c 16384";;
-    *omni*) flags="$flags -c 32768";;
-    *deepseek*) flags="$flags -c 16384";;
-    *) flags="$flags -c 4096";;
-esac
-flags="$flags -fa on -ctk q8_0 -ctv q8_0"
-if echo "$model_lower" | grep -q "deepseek"; then
-    [ "$gpu_arch" -ge 80 ] 2>/dev/null && flags="$flags -mla 3 -khad -vhad"
+# llama-autoflag - Auto-detects hardware and generates optimal ik_llama.cpp flags
+# Version: 2.0.0-ik for ik_llama.cpp
+
+VERSION="2.0.0-ik"
+PROG_NAME="llama-autoflag"
+LLAMA_DIR="./build"
+LLAMA_BIN="$LLAMA_DIR/build/bin/llama-cli"
+
+# Defaults
+MODEL=""
+INF_TYPE="text"
+CONTEXT=0
+KV_QUANT=""
+GPU_MODE="auto"
+DRY_RUN=0
+VERBOSE=0
+DETECT_ONLY=0
+PROMPT=""
+NUM_TOKENS=128
+TEMP="0.6"
+SERVER_PORT=8080
+SPLIT_MODE="graph"
+
+show_help() {
+    echo "Usage: $PROG_NAME -m <model.gguf> [options]"
+    echo ""
+    echo "Options:"
+    echo "  -m, --model <path>      Model file (required)"
+    echo "  -c, --context <n>     Context size (auto-detect if omitted)"
+    echo "  -q, --kv-quant      KV cache quant: q8_0|q4_0|fp16"
+    echo "  -g, --gpu <mode>     GPU mode: auto|none"
+    echo "  -p, --prompt <text>  Prompt to run"
+    echo "  -n, --tokens <n>    Max tokens (default: 128)"
+    echo "  --temp <n>          Temperature (default: 0.6)"
+    echo "  --cpu              Force CPU-only"
+    echo "  --dry-run          Print flags only"
+    echo "  --detect-only     Show hardware detection"
+    echo "  -h, --help        Show help"
+    echo ""
+    echo "Examples:"
+    echo "  $PROG_NAME -m ~/models/Qwen3-8B-Q4_K_M.gguf"
+    echo "  $PROG_NAME -m ~/models/Qwen3-8B-Q4_K_M.gguf --dry-run"
+}
+
+# Parse args
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -m|--model) MODEL="$2"; shift 2 ;;
+        -c|--context) CONTEXT="$2"; shift 2 ;;
+        -q|--kv-quant) KV_QUANT="$2"; shift 2 ;;
+        -g|--gpu) GPU_MODE="$2"; shift 2 ;;
+        -p|--prompt) PROMPT="$2"; shift 2 ;;
+        -n|--tokens) NUM_TOKENS="$2"; shift 2 ;;
+        --temp) TEMP="$2"; shift 2 ;;
+        --cpu) GPU_MODE="none"; shift ;;
+        --dry-run) DRY_RUN=1; shift ;;
+        --detect-only) DETECT_ONLY=1; shift ;;
+        -h|--help) show_help; exit 0 ;;
+        *) shift ;;
+    esac
+done
+
+# Validation
+if [[ -z "$MODEL" ]]; then
+    echo "❌ Error: Model path required (-m <model.gguf>)"
+    show_help
+    exit 1
 fi
-echo "$model_lower" | grep -q "moe" && flags="$flags -fmoe -ooae"
-flags="$flags -t $cpu_threads -gr -muge 0"
-echo "$flags"
+
+if [[ ! -f "$MODEL" ]]; then
+    echo "❌ Error: Model not found: $MODEL"
+    exit 1
+fi
+
+# Detect hardware
+detect_gpus() {
+    if command -v nvidia-smi &>/dev/null; then
+        nvidia-smi --query-gpu=name,memory.total,compute_cap --format=csv,noheader 2>/dev/null
+    fi
+}
+
+detect_cpu() {
+    local cores=$(grep -c ^processor /proc/cpuinfo 2>/dev/null || echo 4)
+    local model=$(grep 'model name' /proc/cpuinfo | head -1 | cut -d':' -f2 | xargs)
+    echo "$model:$cores"
+}
+
+detect_ram() {
+    local mem_kb=$(grep MemTotal /proc/meminfo | awk '{print $2}')
+    echo "$((mem_kb / 1048576))"
+}
+
+# Parse model
+parse_model() {
+    local path="$1"
+    local bytes=$(stat -c%s "$path" 2>/dev/null || echo 0)
+    local gb=$((bytes / 1073741824))
+    local filename=$(basename "$path")
+    
+    # Extract params
+    local params=""
+    local active_params=""
+    local is_moe=0
+    
+    if [[ $filename =~ ([0-9]+)B-A([0-9]+)B ]]; then
+        params="${BASH_REMATCH[1]}B"
+        active_params="${BASH_REMATCH[2]}B"
+        is_moe=1
+    elif [[ $filename =~ ([0-9]+)(\.[0-9]+)?B ]]; then
+        params="${BASH_REMATCH[1]}${BASH_REMATCH[2]}B"
+    fi
+    
+    echo "$gb:$params:$active_params:$is_moe"
+}
+
+parse_family() {
+    local filename=$(basename "$1")
+    if [[ $filename =~ ^[Qq]wen ]]; then echo "qwen";
+    elif [[ $filename =~ ^[Dd]eep[Ss]eek ]]; then echo "deepseek";
+    elif [[ $filename =~ ^[Ll]lama ]]; then echo "llama";
+    elif [[ $filename =~ ^[Gg]emma ]]; then echo "gemma";
+    else echo "unknown"; fi
+}
+
+# Get hardware info
+GPU_INFO=$(detect_gpus)
+CPU_INFO=$(detect_cpu)
+RAM_GB=$(detect_ram)
+MODEL_INFO=$(parse_model "$MODEL")
+MODEL_FAMILY=$(parse_family "$MODEL")
+
+# Parse CPU
+CPU_NAME=$(echo "$CPU_INFO" | cut -d':' -f1)
+CPU_CORES=$(echo "$CPU_INFO" | cut -d':' -f2)
+
+# Parse model
+MODEL_GB=$(echo "$MODEL_INFO" | cut -d':' -f1)
+MODEL_PARAMS=$(echo "$MODEL_INFO" | cut -d':' -f2)
+ACTIVE_PARAMS=$(echo "$MODEL_INFO" | cut -d':' -f3)
+IS_MOE=$(echo "$MODEL_INFO" | cut -d':' -f4)
+
+[[ "$IS_MOE" = "1" && -n "$ACTIVE_PARAMS" ]] && EFFECTIVE_PARAMS="$ACTIVE_PARAMS" || EFFECTIVE_PARAMS="$MODEL_PARAMS"
+
+# Parse GPU
+GPU_COUNT=$(echo "$GPU_INFO" | wc -l)
+TOTAL_VRAM=0
+GPU_NAMES=()
+GPU_VRAMS=()
+GPU_CCS=()
+
+while IFS=',' read -r name vram cc; do
+    [[ -z "$name" ]] && continue
+    name=$(echo "$name" | xargs)
+    vram=$(echo "$vram" | xargs | sed 's/ MiB//')
+    cc=$(echo "$cc" | xargs | tr -d '.')
+    vram_gb=$((vram / 1024))
+    GPU_NAMES+=("$name")
+    GPU_VRAMS+=("$vram_gb")
+    GPU_CCS+=("$cc")
+    TOTAL_VRAM=$((TOTAL_VRAM + vram_gb))
+done <<< "$GPU_INFO"
+
+[[ $GPU_COUNT -eq 0 ]] && TOTAL_VRAM=0
+
+# ik_llama.cpp decision logic
+NGL=0
+SPLIT_FLAG=""
+SAFETY_NOTICES=""
+USE_FIT=0
+
+# Graph split mode for multi-GPU
+if [[ $GPU_COUNT -ge 2 ]] && [[ "$GPU_MODE" != "none" ]] && [[ "$SPLIT_MODE" != "none" ]]; then
+    SPLIT_FLAG="-sm graph"
+    SAFETY_NOTICES+="ℹ Using graph split mode\n"
+elif [[ $GPU_COUNT -ge 2 ]] && [[ "$SPLIT_MODE" == "layer" ]]; then
+    SPLIT_FLAG="-sm layer"
+fi
+
+USABLE_VRAM=$((TOTAL_VRAM - 4))
+[[ $USABLE_VRAM -lt 1 ]] && USABLE_VRAM=1
+
+# Auto-fit check
+if [[ $MODEL_GB -gt $USABLE_VRAM ]]; then
+    USE_FIT=1
+    SAFETY_NOTICES+="ℹ Model exceeds VRAM, using --fit\n"
+fi
+
+# Calculate NGL
+if [[ $GPU_COUNT -gt 0 ]] && [[ "$GPU_MODE" != "none" ]]; then
+    params_num=0
+    [[ -n "$EFFECTIVE_PARAMS" ]] && params_num=$(echo "$EFFECTIVE_PARAMS" | tr -d 'B')
+    
+    if [[ $params_num -gt 0 ]]; then
+        est_layers=32
+        [[ $params_num -ge 70 ]] && est_layers=80
+        [[ $params_num -ge 27 ]] && est_layers=64
+        [[ $params_num -ge 14 ]] && est_layers=48
+        
+        vram_per_layer=$((MODEL_GB / est_layers))
+        [[ $vram_per_layer -eq 0 ]] && vram_per_layer=1
+        
+        if [[ $USE_FIT -eq 1 ]]; then
+            NGL=999
+        else
+            max_layers=$((USABLE_VRAM / vram_per_layer))
+            [[ $max_layers -ge 99 ]] && NGL=99 || NGL=$max_layers
+        fi
+    else
+        ratio=$(awk "BEGIN {printf \"%.2f\", $MODEL_GB / $TOTAL_VRAM}")
+        if [[ $(awk "BEGIN {print $ratio < 0.8}") == "1" ]]; then
+            NGL=99
+        else
+            NGL=$(awk "BEGIN {printf \"%d\", 99 * (1 - $ratio) + 10}")
+            [[ $NGL -lt 10 ]] && NGL=10
+        fi
+    fi
+fi
+
+# Context
+CTX=$CONTEXT
+if [[ $CTX -eq 0 ]]; then
+    case "$MODEL_FAMILY" in
+        qwen|deepseek) CTX=16384 ;;
+        gemma) CTX=8192 ;;
+        *) CTX=4096 ;;
+    esac
+fi
+
+# Threads
+THREADS=$((CPU_CORES / 2))
+[[ $THREADS -lt 1 ]] && THREADS=1
+
+# KV Quant
+CACHE_TYPE_K="f16"
+CACHE_TYPE_V="f16"
+if [[ -n "$KV_QUANT" ]]; then
+    CACHE_TYPE_K="$KV_QUANT"
+    CACHE_TYPE_V="$KV_QUANT"
+else
+    params_num=0
+    [[ -n "$EFFECTIVE_PARAMS" ]] && params_num=$(echo "$EFFECTIVE_PARAMS" | tr -d 'B')
+    
+    if [[ $params_num -lt 10 ]]; then
+        CACHE_TYPE_K="q8_0"; CACHE_TYPE_V="q8_0"
+    elif [[ $params_num -lt 27 ]]; then
+        CACHE_TYPE_K="q8_0"; CACHE_TYPE_V="q4_0"
+    else
+        CACHE_TYPE_K="q8_0"; CACHE_TYPE_V="q8_0"
+    fi
+fi
+
+# ik_llama.cpp extras
+MLA_FLAGS=""
+HADAMARD_FLAGS=""
+MOE_FLAGS=""
+
+# MLA for DeepSeek
+if [[ "$MODEL_FAMILY" == "deepseek" ]] && [[ $GPU_COUNT -gt 0 ]]; then
+    cc_check=${GPU_CCS[0]}
+    if [[ $cc_check -ge 80 ]]; then
+        MLA_FLAGS="-mla 3"
+        HADAMARD_FLAGS="-khad -vhad"
+        SAFETY_NOTICES+="ℹ DeepSeek MLA enabled\n"
+    fi
+fi
+
+# MoE
+[[ "$IS_MOE" == "1" ]] && MOE_FLAGS="-fmoe -ooae"
+
+# Build FLAGS
+FLAGS="-m $MODEL"
+
+[[ $NGL -gt 0 && $USE_FIT -eq 0 ]] && FLAGS="$FLAGS -ngl $NGL"
+[[ $USE_FIT -eq 1 ]] && FLAGS="$FLAGS --fit"
+[[ -n "$SPLIT_FLAG" ]] && FLAGS="$FLAGS $SPLIT_FLAG"
+FLAGS="$FLAGS -ctk $CACHE_TYPE_K -ctv $CACHE_TYPE_V"
+FLAGS="$FLAGS -fa on"
+FLAGS="$FLAGS -c $CTX -t $THREADS"
+FLAGS="$FLAGS -gr -muge 0"
+[[ -n "$MLA_FLAGS" ]] && FLAGS="$FLAGS $MLA_FLAGS"
+[[ -n "$HADAMARD_FLAGS" ]] && FLAGS="$FLAGS $HADAMARD_FLAGS"
+[[ -n "$MOE_FLAGS" ]] && FLAGS="$FLAGS $MOE_FLAGS"
+FLAGS="$FLAGS -b 512 -ub 512"
+
+# Output
+if [[ $DETECT_ONLY -eq 1 ]]; then
+    echo "llama-autoflag v$VERSION — Hardware Detection"
+    echo "CPU: $CPU_NAME, $CPU_CORES cores"
+    echo "RAM: $RAM_GB GB"
+    echo "GPUs: $GPU_COUNT (VRAM: $TOTAL_VRAM GB)"
+    exit 0
+fi
+
+echo ""
+echo "🎯 LLAMA AUTOFLAG v$VERSION (ik_llama.cpp)"
+echo "======================================"
+echo ""
+echo "System: $CPU_NAME, $CPU_CORES cores, $RAM_GB GB RAM"
+echo "GPUs: $GPU_COUNT (VRAM: $TOTAL_VRAM GB)"
+echo "Model: $MODEL (${MODEL_GB} GB)"
+[[ -n "$EFFECTIVE_PARAMS" ]] && echo "Params: $EFFECTIVE_PARAMS"
+[[ "$IS_MOE" == "1" ]] && echo "Type: MoE"
+echo ""
+echo "Config:"
+echo "  GPU Layers: $NGL"
+echo "  Context: $CTX"
+echo "  KV: $CACHE_TYPE_K / $CACHE_TYPE_V"
+echo ""
+echo "Flags:"
+echo "  $FLAGS"
+
+FULL_CMD="$LLAMA_BIN $FLAGS"
+FULL_CMD=$(echo "$FULL_CMD" | tr -s ' ')
+
+echo ""
+echo "Command:"
+echo "  $FULL_CMD"
+
+if [[ $DRY_RUN -eq 1 ]]; then
+    echo ""
+    echo "🏜️  DRY RUN"
+    exit 0
+fi
+
+if [[ -n "$PROMPT" ]]; then
+    FULL_CMD="$FULL_CMD --temp $TEMP -p \"$PROMPT\" -n $NUM_TOKENS"
+fi
+
+echo ""
+echo "▶️  Running..."
+eval $FULL_CMD
