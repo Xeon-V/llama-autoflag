@@ -59,6 +59,11 @@ while test $i -le (count $argv)
         case '--split-mode'
             set i (math $i + 1)
             set SPLIT_MODE $argv[$i]
+        case '--gpu-split'
+            set i (math $i + 1)
+            set GPU_SPLIT $argv[$i]
+        case '--sm-graph'
+            set SPLIT_MODE "graph"
         case '-fa' '--flash-attn'
             set FLASH_ATTN "-fa"
         case '-d' '--draft'
@@ -890,6 +895,14 @@ if test "$INF_TYPE" = "api"; or test -n "$SERVER_MODELS_DIR"
     end
     if test "$SPLIT_MODE" = "row"
         set FLAGS "$FLAGS -sm row"
+    else if test "$SPLIT_MODE" = "graph"
+        set FLAGS "$FLAGS -sm graph"
+        # -smgs 1 = single stream for better PCIe utilization
+        if test $GPU_COUNT -gt 1
+            set FLAGS "$FLAGS -smgs 1"
+        end
+    else if test "$SPLIT_MODE" = "layer"
+        set FLAGS "$FLAGS -sm layer"
     end
 else
     set FLAGS "$FLAGS -b $BATCH -ub $UBATCH"
