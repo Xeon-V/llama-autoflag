@@ -6,6 +6,7 @@
 set -l VERSION "1.4.0"
 set -l PROG_NAME "llama-autoflag"
 set -l LLAMA_DIR "./build"  # default, may be overridden by --llama-dir
+set -l LLAMA_EXE ""  # optional: override full path to binary (e.g., /path/to/llama-server)
 set LLAMA_BIN "$LLAMA_DIR/bin/llama-cli"
 
 # ─── Defaults ───
@@ -46,6 +47,9 @@ while test $i -le (count $argv)
         case '--llama-dir'
             set i (math $i + 1)
             set LLAMA_DIR $argv[$i]
+        case '--llama-exe'
+            set i (math $i + 1)
+            set LLAMA_EXE $argv[$i]
         case '--models-dir'
             set i (math $i + 1)
             set SERVER_MODELS_DIR $argv[$i]
@@ -828,7 +832,12 @@ else
 end
 
 # ─── Build Command ───
-set -l CMD "$LLAMA_BIN"
+# Use custom binary if provided, otherwise use default path
+if test -n "$LLAMA_EXE"
+    set -l CMD "$LLAMA_EXE"
+else
+    set -l CMD "$LLAMA_BIN"
+end
 set -l FLAGS ""
 
 # Add model flag for CLI (not server mode)
