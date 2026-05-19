@@ -4,19 +4,27 @@
 model="$1"
 build_dir="~/llama-lab/build/ik"
 
+if [ -z "$model" ]; then
+    echo "Usage: $0 <model.gguf>"
+    exit 1
+fi
+
 # Hardware detection
-gpu_count=$(nvidia-smi --query-gpu=count --format=csv,noheader 2>/dev/null | head -1 | tr -d ' ')
+gpu_count=$(nvidia-smi --query-gpu=count --format=csv,noheader 2>/dev/null | head -1 | tr -d ' ' || echo "0")
 gpu_arch=$(nvidia-smi --query-gpu=compute_cap --format=csv,noheader 2>/dev/null | head -1 | tr -d '.')
-cpu_threads=$(nproc)
+cpu_threads=$(nproc 2>/dev/null || echo "4")
+
+# Handle empty gpu_count
+gpu_count=${gpu_count:-0}
 
 flags="-m $model"
 
 # GPU offload
-if [ "$gpu_count" -gt 0 ]; then
+if [ "$gpu_count" -gt 0 ] 2>/dev/null; then
     flags="$flags -ngl 999"
     
     # Multi-GPU: use graph split mode
-    if [ "$gpu_count" -ge 2 ]; then
+    if [ "$gpu_count" -ge 2 ] 2>/dev/null; then
         flags="$flags -sm graph"
     fi
 fi
@@ -36,17 +44,19 @@ fi
 flags="$flags -fa on -ctk q8_0 -ctv q8_0"
 
 # MLA for DeepSeek (Ampere+ GPUs)
-if echo "$model" | grep -qi "DeepSeek" && [ "$gpu_arch" -ge 80 ] 2>/dev/null; then
-    flags="$flags -mla 3 -khad -vhad"
+if echo "$model" | grep -qi "DeepSeek"; then
+    if [ "${gpu_arch:-0}" -ge 80 ] 2>/dev/null; then
+        flags="$flags -mla 3 -khad -vhad"
+    fi
 fi
 
 # MoE detection
 if echo "$model" | grep -qi "moe"; then
     flags="$flags -fmoe -ooae"
-    if [ -f "$model" ]; then
+    if [ -f "$model" ] && [ "$gpu_count" -gt 0 ] 2>/dev/null; then
         model_size=$(stat -c%s "$model" 2>/dev/null || echo 0)
         vram_total=$(nvidia-smi --query-gpu=memory.total --format=csv,noheader,nounits 2>/dev/null | awk '{s+=$1} END {print s*1024*1024}')
-        if [ "$model_size" -gt "$vram_total" ]; then
+        if [ "$model_size" -gt "${vram_total:-0}" ]; then
             flags="$flags --fit"
         fi
     fi
