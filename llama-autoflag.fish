@@ -1,5 +1,5 @@
 #!/usr/bin/env fish
-# llama-autoflag.fish v3.0.1-ik - Optimized for ik_llama.cpp
+# llama-autoflag.fish v3.0.2-ik - Optimized for ik_llama.cpp
 
 set -l MODEL ""
 set -l RUN_MODE 0
@@ -60,23 +60,24 @@ test "$family" = "deepseek"; and set CTX 16384
 set THREADS (math "$cpu_cores / 2")
 test $THREADS -lt 1; and set THREADS 1
 
-# Build flags
-set FLAGS "-m $MODEL -ngl $NGL $SPLIT -ctk f16 -ctv f16 -fa on -c $CTX -t $THREADS -gr -muge 0 -b 512 -ub 512"
+# Build flags - NO =1 for boolean flags!
+set FLAGS "-m $MODEL -ngl $NGL $SPLIT -ctk f16 -ctv f16 -fa on -c $CTX -t $THREADS -gr -muge -b 512 -ub 512"
 
-# Output
+# Output - RUN_MODE exits early with just flags
+if test $RUN_MODE -eq 1
+    echo "$FLAGS"
+    exit 0
+end
+
 if test $DETECT_ONLY -eq 1
     echo "GPU: $gpu_count | CPU: $cpu_cores cores"
     exit 0
 end
 
+# Normal output
 echo "NGL: $NGL | Context: $CTX | Threads: $THREADS"
 echo "Flags: $FLAGS"
 
 if test $DRY_RUN -eq 1
     echo "[DRY RUN]"
-    exit 0
-end
-
-if test $RUN_MODE -eq 1
-    echo "$FLAGS"
 end
