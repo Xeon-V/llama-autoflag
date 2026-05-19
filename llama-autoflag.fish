@@ -1,7 +1,8 @@
 #!/usr/bin/env fish
 # llama-autoflag.fish - Auto-generate optimized ik_llama.cpp flags
-# Version: 3.0.2-ik
+# Version: 3.0.3-ik
 
+set -l PROG_NAME "llama-autoflag"
 set -l MODEL ""
 set -l RUN_MODE 0
 set -l DRY_RUN 0
@@ -43,7 +44,7 @@ string match -rq '^[Qq]wen' "$filename"; and set family "qwen"
 string match -rq '^[Dd]eep' "$filename"; and set family "deepseek"
 string match -rq '[Oo]mni' "$filename"; and set family "omni"
 
-# NGL calculation (sweet spot per benchmark)
+# NGL calculation (benchmark-validated sweet spots)
 set NGL 0
 if test $gpu_count -gt 0
     set params_num (echo "$params" | tr -d 'B')
@@ -56,9 +57,11 @@ if test $gpu_count -gt 0
     else; set NGL 37; end
 end
 
-# Reasoning models need more NGL
+# Reasoning/vision models need more NGL
 if test "$family" = "deepseek"
     set NGL 50
+else if test "$family" = "omni"
+    set NGL 40
 end
 
 # Multi-GPU split
@@ -69,13 +72,15 @@ test $gpu_count -ge 2; and set SPLIT "-sm graph"
 set CTX 8192
 if test "$family" = "deepseek"
     set CTX 32768
+else if test "$family" = "omni"
+    set CTX 16384
 end
 
 # Thread count (50% of physical cores)
 set THREADS (math "$cpu_cores / 2")
 test $THREADS -lt 1; and set THREADS 1
 
-# Build flags - VALIDATED settings
+# Build flags (VALIDATED - NOT q8_0, NO =0 for booleans)
 set FLAGS "-m $MODEL -ngl $NGL $SPLIT -ctk f16 -ctv f16 -fa on -c $CTX -t $THREADS -gr -muge -b 512 -ub 512"
 
 # Reasoning flag for DeepSeek
@@ -83,7 +88,7 @@ if test "$family" = "deepseek"
     set FLAGS "$FLAGS --reasoning on"
 end
 
-# Output - RUN_MODE exits early (for piping)
+# RUN_MODE exits early (for piping)
 if test $RUN_MODE -eq 1
     echo "$FLAGS"
     exit 0
