@@ -186,7 +186,7 @@ function __run_self_test
     
     # Test 4: Regex match
     echo -n "Test 4: Regex match (model params)... "
-    set -l result (string match -r '(\d+)B' "Qwen3-8B" | tail -1)
+    set -l result (string match -rg '(\d+)B' "Qwen3-8B" | tail -1)
     if test "$result" = "8B"
         echo "✓ PASS"
         set passed (math $passed + 1)
@@ -197,7 +197,7 @@ function __run_self_test
     
     # Test 5: MoE parsing
     echo -n "Test 5: MoE active-params parsing... "
-    set -l result (string match -r 'A(\d+)B' "Qwen3-30B-A3B" | string replace 'A' '')
+    set -l result (string match -rg 'A(\d+)B' "Qwen3-30B-A3B" | string replace 'A' '')
     if test "$result" = "3B"
         echo "✓ PASS"
         set passed (math $passed + 1)
@@ -366,17 +366,17 @@ function parse_model_size
     
     # Check for MoE pattern: e.g., "30B-A3B" means 30B total, 3B active
     if string match -rq '(\d+(?:\.\d+)?)B-A(\d+(?:\.\d+)?)B' "$filename"
-        set params (string match -r '(\d+(?:\.\d+)?)B-A(\d+(?:\.\d+)?)B' "$filename" | head -1)
-        set active_params (string match -r 'A(\d+(?:\.\d+)?)B' "$filename" | string replace 'A' '')
+        set params (string match -rg '(\d+(?:\.\d+)?)B-A(\d+(?:\.\d+)?)B' "$filename" | head -1)
+        set active_params (string match -rg 'A(\d+(?:\.\d+)?)B' "$filename" | string replace 'A' '')
         set is_moe 1
     else if string match -rq '(\d+)B-A(\d+)B' "$filename"
-        set params (string match -r '(\d+)B-A(\d+)B' "$filename" | head -1)
-        set active_params (string match -r 'A(\d+)B' "$filename" | string replace 'A' '')
+        set params (string match -rg '(\d+)B-A(\d+)B' "$filename" | head -1)
+        set active_params (string match -rg 'A(\d+)B' "$filename" | string replace 'A' '')
         set is_moe 1
     else if string match -rq '(\d+)(\.\d+)?B' "$filename"
-        set params (string match -r '(\d+(?:\.\d+)?)B' "$filename" | tail -1)
+        set params (string match -rg '(\d+(?:\.\d+)?)B' "$filename" | tail -1)
     else if string match -rq '(\d+)(\.\d+)?b' "$filename"
-        set params (string match -r '(\d+(?:\.\d+)?)b' "$filename" | tail -1)
+        set params (string match -rg '(\d+(?:\.\d+)?)b' "$filename" | tail -1)
         set params (string replace 'b' 'B' $params)
     end
 
