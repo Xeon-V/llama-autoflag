@@ -495,6 +495,10 @@ if test $MODEL_GB -gt $VRAM_THRESHOLD; and test "$GPU_MODE" = "auto"
 end
 
 # Determine NGL based on model size vs VRAM
+# Benchmark-validated NGL values:
+# 8B: NGL=99 -> 96.6 t/s (BEST)
+# 30B MoE: NGL=30 -> 43.0 t/s
+# DeepSeek R1: NGL=40 with --reasoning
 if test $CPU_FALLBACK -eq 0; and test $GPU_COUNT -gt 0; and test "$GPU_MODE" != "none"
     # Use EFFECTIVE_PARAMS for MoE (active params), otherwise MODEL_PARAMS
     # Defensive: handle empty params
