@@ -186,7 +186,7 @@ function __run_self_test
     
     # Test 4: Regex match
     echo -n "Test 4: Regex match (model params)... "
-    set -l result (string match -rg '(\d+)B' "Qwen3-8B" | tail -1)
+    set -l result (string match -rg '(\d+B)' "Qwen3-8B" | tail -1)
     if test "$result" = "8B"
         echo "✓ PASS"
         set passed (math $passed + 1)
@@ -197,7 +197,7 @@ function __run_self_test
     
     # Test 5: MoE parsing
     echo -n "Test 5: MoE active-params parsing... "
-    set -l result (string match -rg 'A(\d+)B' "Qwen3-30B-A3B" | string replace 'A' '')
+    set -l result (string match -rg 'A(\d+B)' "Qwen3-30B-A3B")
     if test "$result" = "3B"
         echo "✓ PASS"
         set passed (math $passed + 1)
